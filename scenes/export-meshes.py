@@ -190,6 +190,7 @@ for obj in bpy.data.objects:
 	vertex_count += len(mesh.polygons) * 3
 
 	data.append(local_data)
+	print()
 
 	index += struct.pack('I', vertex_count) #vertex_end
 

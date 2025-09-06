@@ -35,18 +35,6 @@ Load< Scene > npcs_scene(LoadTagDefault, []() -> Scene const * {
 		drawable.pipeline.count = mesh.count;
 
 		glBindVertexArray(drawable.pipeline.vao);
-
-		// choose random body part meshes for each npc on instantiation.
-
-		/*
-		glBindBuffer(GL_ARRAY_BUFFER, npc_meshes->buffer);
-		glm::u8vec4 color = { 0xff, 0x0, 0x00, 0xff };
-		for (size_t i = 0; i < mesh.count; i++) {
-			auto offset = mesh.start + i * npc_meshes->Color.stride + npc_meshes->Color.offset;
-			glBufferSubData(GL_ARRAY_BUFFER, offset, sizeof(glm::u8vec4), &color);
-		}
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
-*/
 	});
 });
 
@@ -66,6 +54,15 @@ PlayMode::PlayMode() : scene(*npcs_scene) {
 	upper_leg_base_rotation = upper_leg->rotation;
 	lower_leg_base_rotation = lower_leg->rotation;
 	*/
+	glm::u8vec3 color = { 0xff, 0x0, 0x00 };
+	glBindBuffer(GL_ARRAY_BUFFER, npc_meshes->buffer);
+	for (auto &drawable : scene.drawables) {
+		for (GLuint i = 0; i < drawable.pipeline.count; i++) {
+			auto offset = (drawable.pipeline.start + i) * npc_meshes->Color.stride + npc_meshes->Color.offset;
+			glBufferSubData(GL_ARRAY_BUFFER, offset, npc_meshes->Color.size, &color);
+		}
+	}
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 	//get pointer to camera for convenience:
 	if (scene.cameras.size() != 1) throw std::runtime_error("Expecting scene to have exactly one camera, but it has " + std::to_string(scene.cameras.size()));

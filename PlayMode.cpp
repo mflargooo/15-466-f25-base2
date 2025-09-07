@@ -13,16 +13,18 @@
 #include <random>
 #include <vector>
 
-std::vector< Mesh >heads;
+std::vector< std::pair< std::string, Mesh > >heads;
 size_t head_bits = 0;
-std::vector< Mesh >bodies;
+std::vector< std::pair< std::string, Mesh > >bodies;
 size_t body_bits = 0;
-std::vector< Mesh >arms;
+std::vector< std::pair< std::string, Mesh > >arms;
 size_t arm_bits = 0;
-std::vector< Mesh >legs;
+std::vector< std::pair< std::string, Mesh > >legs;
 size_t leg_bits = 0;
-std::vector< Mesh >hats;
+std::vector< std::pair< std::string, Mesh > >hats;
 size_t hat_bits = 0;
+
+std::unordered_map< std::string, Scene::Transform * > transforms;
 
 GLuint meshes_for_lit_color_texture_program = 0;
 Load< MeshBuffer > npc_meshes(LoadTagDefault, []() -> MeshBuffer const * {
@@ -33,11 +35,17 @@ Load< MeshBuffer > npc_meshes(LoadTagDefault, []() -> MeshBuffer const * {
 
 Load< Scene > npcs_scene(LoadTagDefault, []() -> Scene const * {
 	return new Scene(data_path("npcs.scene"), [&](Scene &scene, Scene::Transform *transform, std::string const &mesh_name){
+		transforms[mesh_name] = transform;
+		/*
 		Mesh const &mesh = npc_meshes->lookup(mesh_name);
 
 		scene.drawables.emplace_back(transform);
 		Scene::Drawable &drawable = scene.drawables.back();
 
+		std::cout << transform->position.x << ", " << transform->position.y << ", " << transform->position.z << std::endl;
+
+
+		
 		drawable.pipeline = lit_color_texture_program_pipeline;
 
 		drawable.pipeline.vao = meshes_for_lit_color_texture_program;
@@ -46,23 +54,24 @@ Load< Scene > npcs_scene(LoadTagDefault, []() -> Scene const * {
 		drawable.pipeline.count = mesh.count;
 
 		glBindVertexArray(drawable.pipeline.vao);
+		*/
 	});
 });
 
 PlayMode::PlayMode() : scene(*npcs_scene) {
-	//get references to mesh information for convenience
+	//organize meshes for convenience
 	for (auto data : npc_meshes->meshes) {
 		std::cout << data.first << std::endl;
 		if (data.first.find("head") != std::string::npos) {
-			heads.emplace_back(data.second);
+			heads.emplace_back(data);
 		} else if (data.first.find("body") != std::string::npos) {
-			bodies.emplace_back(data.second);
+			bodies.emplace_back(data);
 		} else if (data.first.find("arm") != std::string::npos) {
-			arms.emplace_back(data.second);
+			arms.emplace_back(data);
 		} else if (data.first.find("leg") != std::string::npos) {
-			legs.emplace_back(data.second);
+			legs.emplace_back(data);
 		} else if (data.first.find("hat") != std::string::npos) {
-			hats.emplace_back(data.second);
+			hats.emplace_back(data);
 		} else if (data.first.find("neck") != std::string::npos) {
 			continue;
 		} else {
@@ -87,102 +96,103 @@ PlayMode::PlayMode() : scene(*npcs_scene) {
 	std::mt19937 rng{rd()};
 	std::uniform_int_distribution< size_t > npc_dist(0, total_npcs - 1);
 
-	size_t npc_selection;
+	NPC *npc = new NPC(head_bits, body_bits, arm_bits, leg_bits, hat_bits);
+
 	do  {
-		npc_selection = npc_dist(rng);
+		npc->selection = npc_dist(rng);
 	} while (
-		used_npcs.find(npc_selection) != used_npcs.end() ||
-		(npc_selection & ~(~0x00 << head_bits)) >= heads.size() ||
-		((npc_selection & (~(~0x00 << body_bits) << head_bits)) >> head_bits) >= bodies.size() ||
-		((npc_selection & (~(~0x00 << arm_bits) << (head_bits + body_bits))) >> (head_bits + body_bits)) >= arms.size() ||
-		((npc_selection & (~(~0x00 << arm_bits) << (head_bits + body_bits + arm_bits))) >> (head_bits + body_bits + arm_bits)) >= arms.size() ||
-		((npc_selection & (~(~0x00 << leg_bits) << (head_bits + body_bits + arm_bits * 2))) >> (head_bits + body_bits + arm_bits * 2)) >= legs.size() ||
-		((npc_selection & (~(~0x00 << hat_bits) << (head_bits + body_bits + arm_bits * 2 + leg_bits))) >> (head_bits + body_bits + arm_bits * 2 + leg_bits)) >= legs.size()
+		used_npcs.find(npc->selection) != used_npcs.end() ||
+		npc->get_head() >= heads.size() ||
+		npc->get_body() >= bodies.size() ||
+		npc->get_arm_l() >= arms.size() ||
+		npc->get_arm_r() >= arms.size() ||
+		npc->get_legs() >= legs.size() ||
+		npc->get_hat() >= hats.size()
 	);
-
-	std::cout << npc_selection << std::endl;
-	std::cout << (npc_selection & ~((~0x00) << head_bits));
-	std::cout << ", " << ((npc_selection & ((~((~0x00) << body_bits)) << head_bits)) >> head_bits);
-	std::cout << ", " << ((npc_selection & (~((~0x00) << arm_bits) << (head_bits + body_bits))) >> (head_bits + body_bits));
-	std::cout << ", " << ((npc_selection & (~((~0x00) << arm_bits) << (head_bits + body_bits + arm_bits))) >> (head_bits + body_bits + arm_bits));
-	std::cout << ", " << ((npc_selection & (~((~0x00) << leg_bits) << (head_bits + body_bits + arm_bits * 2))) >> (head_bits + body_bits + arm_bits * 2));
-	std::cout << ", " << ((npc_selection & (~((~0x00) << hat_bits) << (head_bits + body_bits + arm_bits * 2 + leg_bits))) >> (head_bits + body_bits + arm_bits * 2 + leg_bits)) << std::endl;
-	std::cout << heads.size() << ", " << bodies.size() << ", " << arms.size() << ", " << arms.size() << ", " << legs.size() << ", " << hats.size() << std::endl;
-	
-	std::cout << npc_selection << std::endl;
-
-	NPC npc = NPC(head_bits, body_bits, arm_bits, leg_bits, hat_bits, npc_selection);
 	npcs.emplace_back(npc);
-	
-	used_npcs.emplace(npc_selection);
+	used_npcs.emplace(npc->selection);
 
 	// create the transform and drawable with the selected information
-	Scene::Transform head_tf;
-	scene.drawables.emplace_back(&head_tf);
+	npc->head_transform = new Scene::Transform();
+	*(npc->head_transform) = *transforms[heads.at(npc->get_head()).first];
+	scene.drawables.emplace_back(npc->head_transform);
 	Scene::Drawable &head_drawable = scene.drawables.back();
 
-	Scene::Transform body_tf;
-	scene.drawables.emplace_back(&body_tf);
+	npc->body_transform= new Scene::Transform();
+	*(npc->body_transform) = *transforms[bodies.at(npc->get_body()).first];
+	scene.drawables.emplace_back(npc->body_transform);
 	Scene::Drawable &body_drawable = scene.drawables.back();
 
-	Scene::Transform arm_l_tf;
-	scene.drawables.emplace_back(&arm_l_tf);
+	npc->arm_l_transform= new Scene::Transform();
+	*(npc->arm_l_transform) = *transforms[arms.at(npc->get_arm_l()).first];
+	scene.drawables.emplace_back(npc->arm_l_transform);
 	Scene::Drawable &arm_l_drawable = scene.drawables.back();
-
-	Scene::Transform arm_r_tf;
-	scene.drawables.emplace_back(&arm_r_tf);
+	
+	npc->arm_r_transform= new Scene::Transform();
+	*(npc->arm_r_transform) = *transforms[arms.at(npc->get_arm_r()).first];
+	scene.drawables.emplace_back(npc->arm_r_transform);
 	Scene::Drawable &arm_r_drawable = scene.drawables.back();
 
-	Scene::Transform legs_tf;
-	scene.drawables.emplace_back(&legs_tf);
+	npc->legs_transform= new Scene::Transform();
+	*(npc->legs_transform) = *transforms[legs.at(npc->get_legs()).first];
+	scene.drawables.emplace_back(npc->legs_transform);
 	Scene::Drawable &legs_drawable = scene.drawables.back();
 
-	Scene::Transform hat_tf;
-	scene.drawables.emplace_back(&hat_tf);
+	npc->hat_transform= new Scene::Transform();
+	*(npc->hat_transform) = *transforms[hats.at(npc->get_hat()).first];
+	scene.drawables.emplace_back(npc->hat_transform);
 	Scene::Drawable &hat_drawable = scene.drawables.back();
 
-	head_tf.parent = arm_l_tf.parent = arm_r_tf.parent = legs_tf.parent = &body_tf;
-	hat_tf.parent = &head_tf;
+
+	// npc->head_transform->parent = npc->arm_l_transform->parent = npc->arm_r_transform->parent = npc->legs_transform->parent = npc->body_transform;
+	// npc->hat_transform->parent = npc->head_transform;
 	
 	head_drawable.pipeline = lit_color_texture_program_pipeline;
 	head_drawable.pipeline.vao = meshes_for_lit_color_texture_program;
-	head_drawable.pipeline.type = heads.at(npc.get_head()).type;
-	head_drawable.pipeline.start = heads.at(npc.get_head()).start;
-	head_drawable.pipeline.count = heads.at(npc.get_head()).count;
+	head_drawable.pipeline.type = heads.at(npc->get_head()).second.type;
+	head_drawable.pipeline.start = heads.at(npc->get_head()).second.start;
+	head_drawable.pipeline.count = heads.at(npc->get_head()).second.count;
+	glBindVertexArray(head_drawable.pipeline.vao);
 
 	body_drawable.pipeline = lit_color_texture_program_pipeline;
 	body_drawable.pipeline.vao = meshes_for_lit_color_texture_program;
-	body_drawable.pipeline.type = bodies.at(npc.get_body()).type;
-	body_drawable.pipeline.start = bodies.at(npc.get_body()).start;
-	body_drawable.pipeline.count = bodies.at(npc.get_body()).count;
+	body_drawable.pipeline.type = bodies.at(npc->get_body()).second.type;
+	body_drawable.pipeline.start = bodies.at(npc->get_body()).second.start;
+	body_drawable.pipeline.count = bodies.at(npc->get_body()).second.count;
+	glBindVertexArray(body_drawable.pipeline.vao);
 	
 	arm_l_drawable.pipeline = lit_color_texture_program_pipeline;
 	arm_l_drawable.pipeline.vao = meshes_for_lit_color_texture_program;
-	arm_l_drawable.pipeline.type = arms.at(npc.get_arm_l()).type;
-	arm_l_drawable.pipeline.start = arms.at(npc.get_arm_l()).start;
-	arm_l_drawable.pipeline.count = arms.at(npc.get_arm_l()).count;
+	arm_l_drawable.pipeline.type = arms.at(npc->get_arm_l()).second.type;
+	arm_l_drawable.pipeline.start = arms.at(npc->get_arm_l()).second.start;
+	arm_l_drawable.pipeline.count = arms.at(npc->get_arm_l()).second.count;
+	glBindVertexArray(arm_l_drawable.pipeline.vao);
 
 	arm_r_drawable.pipeline = lit_color_texture_program_pipeline;
 	arm_r_drawable.pipeline.vao = meshes_for_lit_color_texture_program;
-	arm_r_drawable.pipeline.type = arms.at(npc.get_arm_r()).type;
-	arm_r_drawable.pipeline.start = arms.at(npc.get_arm_r()).start;
-	arm_r_drawable.pipeline.count = arms.at(npc.get_arm_r()).count;
+	arm_r_drawable.pipeline.type = arms.at(npc->get_arm_r()).second.type;
+	arm_r_drawable.pipeline.start = arms.at(npc->get_arm_r()).second.start;
+	arm_r_drawable.pipeline.count = arms.at(npc->get_arm_r()).second.count;
+	npc->arm_r_transform->scale.x *= -1;
+	npc->arm_r_transform->position.x *= -1;
+	glBindVertexArray(arm_r_drawable.pipeline.vao);
 
 	legs_drawable.pipeline = lit_color_texture_program_pipeline;
 	legs_drawable.pipeline.vao = meshes_for_lit_color_texture_program;
-	legs_drawable.pipeline.type = legs.at(npc.get_legs()).type;
-	legs_drawable.pipeline.start = legs.at(npc.get_legs()).start;
-	legs_drawable.pipeline.count = legs.at(npc.get_legs()).count;
+	legs_drawable.pipeline.type = legs.at(npc->get_legs()).second.type;
+	legs_drawable.pipeline.start = legs.at(npc->get_legs()).second.start;
+	legs_drawable.pipeline.count = legs.at(npc->get_legs()).second.count;
+	glBindVertexArray(legs_drawable.pipeline.vao);
 
 	hat_drawable.pipeline = lit_color_texture_program_pipeline;
 	hat_drawable.pipeline.vao = meshes_for_lit_color_texture_program;
-	hat_drawable.pipeline.type = hats.at(npc.get_hat()).type;
-	hat_drawable.pipeline.start = hats.at(npc.get_hat()).start;
-	hat_drawable.pipeline.count = hats.at(npc.get_hat()).count;
+	hat_drawable.pipeline.type = hats.at(npc->get_hat()).second.type;
+	hat_drawable.pipeline.start = hats.at(npc->get_hat()).second.start;
+	hat_drawable.pipeline.count = hats.at(npc->get_hat()).second.count;
+	glBindVertexArray(hat_drawable.pipeline.vao);
 
-	// issue is that all these are local and go out of scope, so refernces dont exist
 
-	body_tf.position += glm::vec3(2.f);
+	// npc->body_transform->position += glm::vec3(2.f);
 
 	//get pointer to camera for convenience:
 	if (scene.cameras.size() != 1) throw std::runtime_error("Expecting scene to have exactly one camera, but it has " + std::to_string(scene.cameras.size()));

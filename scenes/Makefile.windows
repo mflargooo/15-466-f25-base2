@@ -6,8 +6,8 @@ all : \
     $(DIST)/npcs.pnct \
     $(DIST)/npcs.scene \
 
-$(DIST)/hexapod.scene : hexapod.blend export-scene.py
-    $(BLENDER) --background --python export-scene.py -- "npcs.blend:Main" "$(DIST)/npcs.scene"
+$(DIST)/npcs.scene : npcs_single.blend export-scene.py
+    $(BLENDER) --background --python export-scene.py -- "npcs_single.blend:Main" "$(DIST)/npcs.scene"
 
-$(DIST)/hexapod.pnct : hexapod.blend export-meshes.py
-    $(BLENDER) --background --python export-meshes.py -- "npcs.blend:Main" "$(DIST)/npcs.pnct" 
+$(DIST)/npcs.pnct : npcs_single.blend export-meshes.py
+    $(BLENDER) --background --python export-meshes.py -- "npcs_single.blend:Main" "$(DIST)/npcs.pnct" 

@@ -13,6 +13,13 @@ struct NPC {
 	size_t head_bits, body_bits, arm_bits, leg_bits, hat_bits;
 	size_t selection;
 
+	Scene::Transform *head_transform = nullptr;
+	Scene::Transform *body_transform = nullptr;
+	Scene::Transform *arm_l_transform = nullptr;
+	Scene::Transform *arm_r_transform = nullptr;
+	Scene::Transform *legs_transform = nullptr;
+	Scene::Transform *hat_transform = nullptr;
+
 	size_t get_head() {
 		return selection & ~(~(size_t)0x0 << head_bits);
 	}
@@ -42,7 +49,8 @@ struct NPC {
 		return (selection & (~(~(size_t)0x0 << hat_bits) << offset)) >> offset;
 	}
 
-	NPC(size_t head_bits, size_t body_bits, size_t arm_bits, size_t leg_bits, size_t hat_bits, size_t selection) : selection(selection) {};
+	NPC(size_t head_bits, size_t body_bits, size_t arm_bits, size_t leg_bits, size_t hat_bits) :
+		head_bits(head_bits), body_bits(body_bits), arm_bits(arm_bits), leg_bits(leg_bits), hat_bits(hat_bits) {};
 };
 
 struct PlayMode : Mode {
@@ -66,7 +74,7 @@ struct PlayMode : Mode {
 	Scene scene;
 
 	std::set< size_t > used_npcs;
-	std::vector< NPC > npcs;
+	std::vector< NPC * > npcs;
 	
 	//camera:
 	Scene::Camera *camera = nullptr;

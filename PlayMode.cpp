@@ -113,40 +113,42 @@ PlayMode::PlayMode() : scene(*npcs_scene) {
 	used_npcs.emplace(npc->selection);
 
 	// create the transform and drawable with the selected information
+
 	npc->head_transform = new Scene::Transform();
+	npc->body_transform= new Scene::Transform();
+	npc->arm_l_transform= new Scene::Transform();
+	npc->arm_r_transform= new Scene::Transform();
+	npc->legs_transform= new Scene::Transform();
+	npc->hat_transform= new Scene::Transform();
+
 	*(npc->head_transform) = *transforms[heads.at(npc->get_head()).first];
+	*(npc->body_transform) = *transforms[bodies.at(npc->get_body()).first];
+	*(npc->arm_l_transform) = *transforms[arms.at(npc->get_arm_l()).first];
+	*(npc->arm_r_transform) = *transforms[arms.at(npc->get_arm_r()).first];
+	*(npc->legs_transform) = *transforms[legs.at(npc->get_legs()).first];
+	*(npc->hat_transform) = *transforms[hats.at(npc->get_hat()).first];
+
+	npc->head_transform->parent = npc->arm_l_transform->parent = npc->arm_r_transform->parent = npc->legs_transform->parent = npc->body_transform;
+	npc->hat_transform->parent = npc->head_transform;
+
 	scene.drawables.emplace_back(npc->head_transform);
 	Scene::Drawable &head_drawable = scene.drawables.back();
 
-	npc->body_transform= new Scene::Transform();
-	*(npc->body_transform) = *transforms[bodies.at(npc->get_body()).first];
 	scene.drawables.emplace_back(npc->body_transform);
 	Scene::Drawable &body_drawable = scene.drawables.back();
 
-	npc->arm_l_transform= new Scene::Transform();
-	*(npc->arm_l_transform) = *transforms[arms.at(npc->get_arm_l()).first];
 	scene.drawables.emplace_back(npc->arm_l_transform);
 	Scene::Drawable &arm_l_drawable = scene.drawables.back();
 	
-	npc->arm_r_transform= new Scene::Transform();
-	*(npc->arm_r_transform) = *transforms[arms.at(npc->get_arm_r()).first];
 	scene.drawables.emplace_back(npc->arm_r_transform);
 	Scene::Drawable &arm_r_drawable = scene.drawables.back();
 
-	npc->legs_transform= new Scene::Transform();
-	*(npc->legs_transform) = *transforms[legs.at(npc->get_legs()).first];
 	scene.drawables.emplace_back(npc->legs_transform);
 	Scene::Drawable &legs_drawable = scene.drawables.back();
 
-	npc->hat_transform= new Scene::Transform();
-	*(npc->hat_transform) = *transforms[hats.at(npc->get_hat()).first];
 	scene.drawables.emplace_back(npc->hat_transform);
 	Scene::Drawable &hat_drawable = scene.drawables.back();
 
-
-	// npc->head_transform->parent = npc->arm_l_transform->parent = npc->arm_r_transform->parent = npc->legs_transform->parent = npc->body_transform;
-	// npc->hat_transform->parent = npc->head_transform;
-	
 	head_drawable.pipeline = lit_color_texture_program_pipeline;
 	head_drawable.pipeline.vao = meshes_for_lit_color_texture_program;
 	head_drawable.pipeline.type = heads.at(npc->get_head()).second.type;
@@ -192,7 +194,7 @@ PlayMode::PlayMode() : scene(*npcs_scene) {
 	glBindVertexArray(hat_drawable.pipeline.vao);
 
 
-	// npc->body_transform->position += glm::vec3(2.f);
+	npc->body_transform->position += glm::vec3(2.f);
 
 	//get pointer to camera for convenience:
 	if (scene.cameras.size() != 1) throw std::runtime_error("Expecting scene to have exactly one camera, but it has " + std::to_string(scene.cameras.size()));

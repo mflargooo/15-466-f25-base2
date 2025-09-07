@@ -1,11 +1,49 @@
 #include "Mode.hpp"
 
 #include "Scene.hpp"
+#include "Mesh.hpp"
 
 #include <glm/glm.hpp>
 
 #include <vector>
 #include <deque>
+#include <set>
+
+struct NPC {
+	size_t head_bits, body_bits, arm_bits, leg_bits, hat_bits;
+	size_t selection;
+
+	size_t get_head() {
+		return selection & ~(~(size_t)0x0 << head_bits);
+	}
+
+	size_t get_body() {
+		size_t offset = head_bits;
+		return (selection & (~(~(size_t)0x0 << body_bits) << offset)) >> offset;
+	}
+
+	size_t get_arm_l() {
+		size_t offset = head_bits + body_bits;
+		return (selection & (~(~(size_t)0x0 << arm_bits) << offset)) >> offset;
+	}
+
+	size_t get_arm_r() {
+		size_t offset = head_bits + body_bits + arm_bits;
+		return (selection & (~(~(size_t)0x0 << arm_bits) << offset)) >> offset;
+	}
+
+	size_t get_legs() {
+		size_t offset = head_bits + body_bits + arm_bits * 2;
+		return (selection & (~(~(size_t)0x0 << leg_bits) << offset)) >> offset;
+	}
+
+	size_t get_hat() {
+		size_t offset = head_bits + body_bits + arm_bits * 2 + leg_bits;
+		return (selection & (~(~(size_t)0x0 << hat_bits) << offset)) >> offset;
+	}
+
+	NPC(size_t head_bits, size_t body_bits, size_t arm_bits, size_t leg_bits, size_t hat_bits, size_t selection) : selection(selection) {};
+};
 
 struct PlayMode : Mode {
 	PlayMode();
@@ -27,14 +65,8 @@ struct PlayMode : Mode {
 	//local copy of the game scene (so code can change it during gameplay):
 	Scene scene;
 
-	//hexapod leg to wobble:
-	Scene::Transform *hip = nullptr;
-	Scene::Transform *upper_leg = nullptr;
-	Scene::Transform *lower_leg = nullptr;
-	glm::quat hip_base_rotation;
-	glm::quat upper_leg_base_rotation;
-	glm::quat lower_leg_base_rotation;
-	float wobble = 0.0f;
+	std::set< size_t > used_npcs;
+	std::vector< NPC > npcs;
 	
 	//camera:
 	Scene::Camera *camera = nullptr;

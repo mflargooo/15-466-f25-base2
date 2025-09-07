@@ -13,18 +13,8 @@
 #include <random>
 #include <vector>
 
-std::vector< std::pair< std::string, Mesh > >heads;
-size_t head_bits = 0;
-std::vector< std::pair< std::string, Mesh > >bodies;
-size_t body_bits = 0;
-std::vector< std::pair< std::string, Mesh > >arms;
-size_t arm_bits = 0;
-std::vector< std::pair< std::string, Mesh > >legs;
-size_t leg_bits = 0;
-std::vector< std::pair< std::string, Mesh > >hats;
-size_t hat_bits = 0;
-
-std::unordered_map< std::string, Scene::Transform * > transforms;
+NPCCreator npc_creator({ "head", "body", "arm", "legs", "hat" }, { "head", "body", "arm_l", "arm_r", "legs", "hat" });
+std::map< std::string, Scene::Transform * > mesh_transforms;
 
 GLuint meshes_for_lit_color_texture_program = 0;
 Load< MeshBuffer > npc_meshes(LoadTagDefault, []() -> MeshBuffer const * {
@@ -35,7 +25,7 @@ Load< MeshBuffer > npc_meshes(LoadTagDefault, []() -> MeshBuffer const * {
 
 Load< Scene > npcs_scene(LoadTagDefault, []() -> Scene const * {
 	return new Scene(data_path("npcs.scene"), [&](Scene &scene, Scene::Transform *transform, std::string const &mesh_name){
-		transforms[mesh_name] = transform;
+		mesh_transforms[mesh_name] = transform;
 		/*
 		Mesh const &mesh = npc_meshes->lookup(mesh_name);
 
@@ -60,60 +50,30 @@ Load< Scene > npcs_scene(LoadTagDefault, []() -> Scene const * {
 
 PlayMode::PlayMode() : scene(*npcs_scene) {
 	//organize meshes for convenience
-	for (auto data : npc_meshes->meshes) {
-		std::cout << data.first << std::endl;
-		if (data.first.find("head") != std::string::npos) {
-			heads.emplace_back(data);
-		} else if (data.first.find("body") != std::string::npos) {
-			bodies.emplace_back(data);
-		} else if (data.first.find("arm") != std::string::npos) {
-			arms.emplace_back(data);
-		} else if (data.first.find("leg") != std::string::npos) {
-			legs.emplace_back(data);
-		} else if (data.first.find("hat") != std::string::npos) {
-			hats.emplace_back(data);
-		} else if (data.first.find("neck") != std::string::npos) {
-			continue;
-		} else {
-			throw new std::runtime_error("Cannot categorize mesh named " + data.first);
+	npc_creator.initialize();
+	npc_creator.register_data(&(npc_meshes->meshes), &(mesh_transforms));
+
+	auto npcs = npc_creator.create_npcs(1);
+	npcs;
+	/*
+	for (auto npc : *npcs) {
+		for (size_t i = 0; i < npc_creator.part_names.size(); i++) {
+			std::string part_name = npc_creator.part_names[i];
+			scene.drawables.emplace_back(npc.parts[part_name].second);
+			Scene::Drawable &drawable = scene.drawables.back();
+			
+			drawable.pipeline = lit_color_texture_program_pipeline;
+			drawable.pipeline.vao = meshes_for_lit_color_texture_program;
+			drawable.pipeline.type = npc.parts[part_name].first->type;
+			drawable.pipeline.start = npc.parts[part_name].first->start;
+			drawable.pipeline.count = npc.parts[part_name].first->count;
 		}
+
+		npc.parts["body"].second->position += glm::vec3((float) std::rand() / (float) RAND_MAX * 5.f, (float) std::rand() / (float) RAND_MAX * 5.f, (float) std::rand() / (float) RAND_MAX * 5.f);
 	}
-
-	head_bits = (size_t)std::ceilf(std::log2f((float) heads.size()));
-	body_bits = (size_t)std::ceilf(std::log2f((float) bodies.size()));
-	arm_bits = (size_t)std::ceilf(std::log2f((float) arms.size()));
-	leg_bits = (size_t)std::ceilf(std::log2f((float) legs.size()));
-	hat_bits = (size_t)std::ceilf(std::log2f((float) hats.size()));
-
-	std::cout << head_bits + body_bits + arm_bits + leg_bits + hat_bits << std::endl;
-	size_t total_npcs = heads.size() * bodies.size() * arms.size() * arms.size() * legs.size() * hats.size();
-	assert(total_npcs > 0);
-
-	assert(head_bits + body_bits + arm_bits + arm_bits + leg_bits + hat_bits <= std::ceilf(std::log2f((float) total_npcs)));
-
-	// c++ random generation from stackoverflow: https://stackoverflow.com/questions/7560114/random-number-c-in-some-range
-	std::random_device rd;
-	std::mt19937 rng{rd()};
-	std::uniform_int_distribution< size_t > npc_dist(0, total_npcs - 1);
-
-	NPC *npc = new NPC(head_bits, body_bits, arm_bits, leg_bits, hat_bits);
-
-	do  {
-		npc->selection = npc_dist(rng);
-	} while (
-		used_npcs.find(npc->selection) != used_npcs.end() ||
-		npc->get_head() >= heads.size() ||
-		npc->get_body() >= bodies.size() ||
-		npc->get_arm_l() >= arms.size() ||
-		npc->get_arm_r() >= arms.size() ||
-		npc->get_legs() >= legs.size() ||
-		npc->get_hat() >= hats.size()
-	);
-	npcs.emplace_back(npc);
-	used_npcs.emplace(npc->selection);
-
+		*/
 	// create the transform and drawable with the selected information
-
+	/*
 	npc->head_transform = new Scene::Transform();
 	npc->body_transform= new Scene::Transform();
 	npc->arm_l_transform= new Scene::Transform();
@@ -195,6 +155,7 @@ PlayMode::PlayMode() : scene(*npcs_scene) {
 
 
 	npc->body_transform->position += glm::vec3(2.f);
+	*/
 
 	//get pointer to camera for convenience:
 	if (scene.cameras.size() != 1) throw std::runtime_error("Expecting scene to have exactly one camera, but it has " + std::to_string(scene.cameras.size()));
@@ -265,25 +226,6 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 }
 
 void PlayMode::update(float elapsed) {
-
-	/*
-	//slowly rotates through [0,1):
-	wobble += elapsed / 10.0f;
-	wobble -= std::floor(wobble);
-
-	hip->rotation = hip_base_rotation * glm::angleAxis(
-		glm::radians(5.0f * std::sin(wobble * 2.0f * float(M_PI))),
-		glm::vec3(0.0f, 1.0f, 0.0f)
-	);
-	upper_leg->rotation = upper_leg_base_rotation * glm::angleAxis(
-		glm::radians(7.0f * std::sin(wobble * 2.0f * 2.0f * float(M_PI))),
-		glm::vec3(0.0f, 0.0f, 1.0f)
-	);
-	lower_leg->rotation = lower_leg_base_rotation * glm::angleAxis(
-		glm::radians(10.0f * std::sin(wobble * 3.0f * 2.0f * float(M_PI))),
-		glm::vec3(0.0f, 0.0f, 1.0f)
-	);
-	*/
 
 	//move camera:
 	{

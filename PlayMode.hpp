@@ -30,6 +30,8 @@ struct PlayMode : Mode {
 
 	//local copy of the game scene (so code can change it during gameplay):
 	Scene scene;
+
+	std::list< NPCCreator::NPC > npcs;
 	
 	//camera:
 	Scene::Camera *camera = nullptr;

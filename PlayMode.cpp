@@ -13,10 +13,9 @@
 #include <random>
 #include <vector>
 
-NPCCreator npc_creator({ "head", "body", "arm", "legs", "hat" }, { "head", "body", "arm_l", "arm_r", "legs", "hat" });
-std::map< std::string, Scene::Transform * > mesh_transforms;
 
 GLuint meshes_for_lit_color_texture_program = 0;
+NPCCreator npc_creator({ "head", "body", "arm", "legs", "hat" }, { "head", "body", "arm_l", "arm_r", "legs", "hat" });
 Load< MeshBuffer > npc_meshes(LoadTagDefault, []() -> MeshBuffer const * {
 	MeshBuffer const *ret = new MeshBuffer(data_path("npcs.pnct"));
 	meshes_for_lit_color_texture_program = ret->make_vao_for_program(lit_color_texture_program->program);
@@ -25,9 +24,10 @@ Load< MeshBuffer > npc_meshes(LoadTagDefault, []() -> MeshBuffer const * {
 
 Load< Scene > npcs_scene(LoadTagDefault, []() -> Scene const * {
 	return new Scene(data_path("npcs.scene"), [&](Scene &scene, Scene::Transform *transform, std::string const &mesh_name){
-		mesh_transforms[mesh_name] = transform;
-		/*
 		Mesh const &mesh = npc_meshes->lookup(mesh_name);
+		npc_creator.mesh_templates[mesh_name].first = &mesh;
+		npc_creator.mesh_templates[mesh_name].second = transform;
+		/*
 
 		scene.drawables.emplace_back(transform);
 		Scene::Drawable &drawable = scene.drawables.back();
@@ -51,31 +51,56 @@ Load< Scene > npcs_scene(LoadTagDefault, []() -> Scene const * {
 PlayMode::PlayMode() : scene(*npcs_scene) {
 	//organize meshes for convenience
 	npc_creator.initialize();
-	npc_creator.register_data(&(npc_meshes->meshes), &(mesh_transforms));
+	npc_creator.register_data(&(npc_meshes->meshes));
 
-	std::vector<NPCCreator::NPC> *npcs = npc_creator.create_npcs(1);
-	for (auto npc : *npcs) {
-		for (auto p : npc.parts) {
-			scene.drawables.emplace_back(p.second.second);
+	std::vector< NPCCreator::NPCInfo > npc_infos = npc_creator.create_npc_infos(1);
+
+    for (auto info : npc_infos) {
+        npcs.emplace_back(NPCCreator::NPC(info));
+        NPCCreator::NPC npc = npcs.back();
+
+        npc.info = &info;
+		size_t count = 0;
+        for (auto names : info.mesh_names) {
+            std::string part_name = names.first;
+            std::string mesh_name = names.second;
+            auto mesh = npc_creator.mesh_templates[mesh_name].first;
+            auto transform = npc_creator.mesh_templates[mesh_name].second;
+
+            scene.drawables.emplace_back(new Scene::Transform());
 			Scene::Drawable &drawable = scene.drawables.back();
+			if (count == 0) {
+				npc.begin = std::prev(scene.drawables.end());
+			} else if (count == info.mesh_names.size() - 1) {
+				npc.end = std::prev(scene.drawables.end());
+			}
 
-			drawable.pipeline = lit_color_texture_program_pipeline;
-			drawable.pipeline.vao = meshes_for_lit_color_texture_program;
-			drawable.pipeline.type = p.second.first->type;
-			drawable.pipeline.start = p.second.first->start;
-			drawable.pipeline.count = p.second.first->count;
-			
-			std::cout << p.first << ", " << npc.creator->selection_to_mesh_name[p.first][npc.get_from_selection(p.first)] << ": " << drawable.pipeline.type << ", " << drawable.pipeline.start << ", " << drawable.pipeline.count << std::endl;
+            *drawable.transform = *transform;
+            
+            drawable.pipeline = lit_color_texture_program_pipeline;
+            drawable.pipeline.vao = meshes_for_lit_color_texture_program;
+            drawable.pipeline.type = mesh->type;
+            drawable.pipeline.start = mesh->start;
+            drawable.pipeline.count = mesh->count;
+
+			count += 1;
+        }
+    }
+
+	/*
+	for (auto npc : npcs) {
+		for (auto &drawable : npc.drawables) {
+			scene.drawables.emplace_back(drawable.second);
 		}
 
-		npc.parts["head"].second->parent = npc.parts["arm_l"].second->parent = npc.parts["arm_r"].second->parent = npc.parts["legs"].second->parent = npc.parts["body"].second;
-		npc.parts["hat"].second->parent = npc.parts["head"].second;
+		npc.drawables["head"].transform->parent = npc.drawables["arm_l"].transform->parent = npc.drawables["arm_r"].transform->parent = npc.drawables["legs"].transform->parent = npc.drawables["body"].transform;
+		npc.drawables["hat"].transform->parent = npc.drawables["head"].transform;
 
 		// flip the right arm to the other side of the body
-		npc.parts["arm_r"].second->scale.x *= -1;
-		npc.parts["arm_r"].second->position.x *= -1;
+		npc.drawables["arm_r"].transform->scale.x *= -1;
+		npc.drawables["arm_r"].transform->position.x *= -1;
 		//npc.parts["body"].second->position += glm::vec3((float) std::rand() / (float) RAND_MAX * 5.f, (float) std::rand() / (float) RAND_MAX * 5.f, (float) std::rand() / (float) RAND_MAX * 5.f);
-	}
+	}*/
 	// create the transform and drawable with the selected information
 	/*
 	npc->head_transform = new Scene::Transform();

@@ -53,14 +53,13 @@ PlayMode::PlayMode() : scene(*npcs_scene) {
 	npc_creator.initialize();
 	npc_creator.register_data(&(npc_meshes->meshes));
 
-	std::vector< NPCCreator::NPCInfo > npc_infos = npc_creator.create_npc_infos(1);
+	std::vector< NPCCreator::NPCInfo > npc_infos = npc_creator.create_npc_infos(3);
 
     for (auto info : npc_infos) {
         npcs.emplace_back(NPCCreator::NPC(info));
         NPCCreator::NPC npc = npcs.back();
 
         npc.info = &info;
-		size_t count = 0;
         for (auto names : info.mesh_names) {
             std::string part_name = names.first;
             std::string mesh_name = names.second;
@@ -69,23 +68,24 @@ PlayMode::PlayMode() : scene(*npcs_scene) {
 
             scene.drawables.emplace_back(new Scene::Transform());
 			Scene::Drawable &drawable = scene.drawables.back();
-			if (count == 0) {
-				npc.begin = std::prev(scene.drawables.end());
-			} else if (count == info.mesh_names.size() - 1) {
-				npc.end = std::prev(scene.drawables.end());
-			}
+			npc.drawables[part_name] = &drawable;
 
             *drawable.transform = *transform;
-            
-            drawable.pipeline = lit_color_texture_program_pipeline;
+
+			drawable.pipeline = lit_color_texture_program_pipeline;
             drawable.pipeline.vao = meshes_for_lit_color_texture_program;
             drawable.pipeline.type = mesh->type;
             drawable.pipeline.start = mesh->start;
             drawable.pipeline.count = mesh->count;
-
-			count += 1;
         }
-    }
+		npc.drawables["head"]->transform->parent = npc.drawables["arm_l"]->transform->parent = npc.drawables["arm_r"]->transform->parent = npc.drawables["legs"]->transform->parent = npc.drawables["body"]->transform;
+		npc.drawables["hat"]->transform->parent = npc.drawables["head"]->transform;
+		
+		npc.drawables["arm_r"]->transform->scale.x *= -1;
+		npc.drawables["arm_r"]->transform->position.x *= -1;
+		
+		npc.drawables["body"]->transform->position += glm::vec3((float) std::rand() / (float) RAND_MAX * 10.f, (float) std::rand() / (float) RAND_MAX * 10.f, 0.f);
+	}
 
 	/*
 	for (auto npc : npcs) {

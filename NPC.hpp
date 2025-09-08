@@ -44,8 +44,7 @@ struct NPCCreator {
 
     struct NPC {
         NPCInfo *info;
-        std::list< Scene::Drawable >::iterator begin;
-        std::list< Scene::Drawable >::iterator end;
+        std::map < std::string, Scene::Drawable * > drawables;
 
         NPC(NPCInfo info) : info(&info) {};
         NPC(NPCInfo *info) : info(info) {};

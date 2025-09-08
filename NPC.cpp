@@ -40,7 +40,7 @@ void NPCCreator::register_data(const std::map< std::string, Mesh > *meshes, std:
             if (transform != (*transforms).end()) {
                 data[tag][mesh.first].first = &mesh.second;
                 data[tag][mesh.first].second = transform->second;
-
+                std::cout << mesh.first << std::endl;
                 selection_to_mesh_name[tag][(uint8_t)(selection_to_mesh_name[tag].size())] = mesh.first;
 
                 if (num_of.find(tag) == num_of.end()) num_of[tag] = 0;
@@ -74,59 +74,47 @@ void NPCCreator::register_data(const std::map< std::string, Mesh > *meshes, std:
 std::vector< NPCCreator::NPC > *NPCCreator::create_npcs(size_t amount) {
     assert(total_possible_npcs > 0 && amount + used_npcs.size() < total_possible_npcs);
 
-    std::vector< NPC > *ret = new std::vector< NPC >(amount, NPC(this));
+    std::vector< NPC > *ret = new std::vector< NPC >();
+    ret->reserve(amount);
     
     for (size_t i = 0; i < amount; i++) {
-        NPC *npc = &(ret->at(i));
+        ret->emplace_back(this);
+        NPC *npc = &(ret->back());
         assert(npc);
 
-        size_t selection = 0;
+        size_t selection;
         std::string part;
         std::string tag;
         do  {
             selection = 0;
-            for (size_t j = part_names.size()-1; j >= 0; j--) {
-                part = part_names[j];
-                tag = tag_of[part_names[j]];
+            for (size_t j = 0; j < part_names.size(); j++) {
+                part = part_names[part_names.size() - j - 1];
+                tag = tag_of[part_names[part_names.size() - j - 1]];
                 std::uniform_int_distribution< size_t > npc_dist = std::uniform_int_distribution< size_t >(0, (size_t)(num_of[tag] - 1));
-                selection <<= (size_t)bits_of[tag];
-                size_t r = ~(~(size_t)0 << (size_t)bits_of[tag]);
-                size_t q = (npc_dist(rng) & r);
-                selection |= q;
-                std::cout << (size_t)(selection & 0x1) << std::endl;
+                selection = (selection << (size_t)bits_of[tag]) | (npc_dist(rng) & ~(~(size_t)0 << (size_t)bits_of[tag]));
             }
-            assert(npc);
-            std::cout << npc->selection << std::endl;
-            /*
-            std::cout << (size_t)(npc->get_from_selection("head")) << " " ;
-            std::cout << (size_t)(npc->get_from_selection("body")) << " " ;
-            std::cout << (size_t)(npc->get_from_selection("arm_l")) << " " ;
-            std::cout << (size_t)(npc->get_from_selection("arm_r")) << " " ;
-            std::cout << (size_t)(npc->get_from_selection("legs")) << " " ;
-            std::cout << (size_t)(npc->get_from_selection("hat")) << " " ;
-            */
         } while (used_npcs.find(selection) != used_npcs.end());
-        /*
+        
         npc->selection = selection;
         used_npcs.emplace(npc->selection);
 
-        std::cout << npc->selection << ": " << std::endl;
-
+        std::cout << "we are here" << std::endl;
         for (size_t j = 0; j < part_names.size(); j++) {
-            std::string part = part_names[j];
-            std::string tag = tag_of[part];
+            part = part_names[j];
+            tag = tag_of[part];
 
             auto mesh_name = selection_to_mesh_name[tag][npc->get_from_selection(part)];
             auto part_info = npc->creator->data[tag][mesh_name];
             
-            assert(!part_info.first && !part_info.second);
+            assert(part_info.first && part_info.second);
 
             npc->parts[part].first = part_info.first;
+			std::cout << part << ", " << mesh_name << ": " << part_info.first->type << ", " << part_info.first->start << ", " << part_info.first->count << std::endl;
             npc->parts[part].second = new Scene::Transform();
             
             *(npc->parts[part].second) = *part_info.second;
         }
-            */
+            std::cout << "we are not here :(" << std::endl;
     }
 
     return ret;

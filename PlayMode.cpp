@@ -53,25 +53,29 @@ PlayMode::PlayMode() : scene(*npcs_scene) {
 	npc_creator.initialize();
 	npc_creator.register_data(&(npc_meshes->meshes), &(mesh_transforms));
 
-	auto npcs = npc_creator.create_npcs(1);
-	npcs;
-	/*
+	std::vector<NPCCreator::NPC> *npcs = npc_creator.create_npcs(1);
 	for (auto npc : *npcs) {
-		for (size_t i = 0; i < npc_creator.part_names.size(); i++) {
-			std::string part_name = npc_creator.part_names[i];
-			scene.drawables.emplace_back(npc.parts[part_name].second);
+		for (auto p : npc.parts) {
+			scene.drawables.emplace_back(p.second.second);
 			Scene::Drawable &drawable = scene.drawables.back();
-			
+
 			drawable.pipeline = lit_color_texture_program_pipeline;
 			drawable.pipeline.vao = meshes_for_lit_color_texture_program;
-			drawable.pipeline.type = npc.parts[part_name].first->type;
-			drawable.pipeline.start = npc.parts[part_name].first->start;
-			drawable.pipeline.count = npc.parts[part_name].first->count;
+			drawable.pipeline.type = p.second.first->type;
+			drawable.pipeline.start = p.second.first->start;
+			drawable.pipeline.count = p.second.first->count;
+			
+			std::cout << p.first << ", " << npc.creator->selection_to_mesh_name[p.first][npc.get_from_selection(p.first)] << ": " << drawable.pipeline.type << ", " << drawable.pipeline.start << ", " << drawable.pipeline.count << std::endl;
 		}
 
-		npc.parts["body"].second->position += glm::vec3((float) std::rand() / (float) RAND_MAX * 5.f, (float) std::rand() / (float) RAND_MAX * 5.f, (float) std::rand() / (float) RAND_MAX * 5.f);
+		npc.parts["head"].second->parent = npc.parts["arm_l"].second->parent = npc.parts["arm_r"].second->parent = npc.parts["legs"].second->parent = npc.parts["body"].second;
+		npc.parts["hat"].second->parent = npc.parts["head"].second;
+
+		// flip the right arm to the other side of the body
+		npc.parts["arm_r"].second->scale.x *= -1;
+		npc.parts["arm_r"].second->position.x *= -1;
+		//npc.parts["body"].second->position += glm::vec3((float) std::rand() / (float) RAND_MAX * 5.f, (float) std::rand() / (float) RAND_MAX * 5.f, (float) std::rand() / (float) RAND_MAX * 5.f);
 	}
-		*/
 	// create the transform and drawable with the selected information
 	/*
 	npc->head_transform = new Scene::Transform();
@@ -88,8 +92,6 @@ PlayMode::PlayMode() : scene(*npcs_scene) {
 	*(npc->legs_transform) = *transforms[legs.at(npc->get_legs()).first];
 	*(npc->hat_transform) = *transforms[hats.at(npc->get_hat()).first];
 
-	npc->head_transform->parent = npc->arm_l_transform->parent = npc->arm_r_transform->parent = npc->legs_transform->parent = npc->body_transform;
-	npc->hat_transform->parent = npc->head_transform;
 
 	scene.drawables.emplace_back(npc->head_transform);
 	Scene::Drawable &head_drawable = scene.drawables.back();
@@ -229,7 +231,6 @@ void PlayMode::update(float elapsed) {
 
 	//move camera:
 	{
-
 		//combine inputs into a move:
 		constexpr float PlayerSpeed = 30.0f;
 		glm::vec2 move = glm::vec2(0.0f);
@@ -270,7 +271,7 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 	glUseProgram(0);
 
 
-	glClearColor(.5f, .5f, .5f, 1.0f); // used to set background color...maybe can use it for a day/night cycle?
+	glClearColor(0.f, 0.f, 0.f, 1.0f); // used to set background color...maybe can use it for a day/night cycle?
 	glClearDepth(1.0f); //1.0 is actually the default value to clear the depth buffer to, but FYI you can change it.
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 

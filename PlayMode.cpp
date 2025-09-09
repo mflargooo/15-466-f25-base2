@@ -12,7 +12,7 @@
 
 #include <random>
 #include <vector>
-
+#include <algorithm>
 
 GLuint npc_meshes_for_lit_color_texture_program = 0;
 NPCCreator npc_creator({ "head", "body", "arm", "legs", "hat" }, { "head", "body", "arm_l", "arm_r", "legs", "hat" });
@@ -48,70 +48,142 @@ Load < Scene > ufo_scene(LoadTagDefault, []() -> Scene const * {
 });
 
 PlayMode::PlayMode() : scene(*ufo_scene) {
-	//organize meshes for convenience
-	npc_creator.initialize();
-	npc_creator.register_data(&(npc_meshes->meshes));
+	// create npcs
+	{
+		//organize meshes for convenience
+		npc_creator.initialize();
+		npc_creator.register_data(&(npc_meshes->meshes));
 
-	std::vector< NPCCreator::NPCInfo > npc_infos = npc_creator.create_npc_infos(10);
+		const Mesh *body_mesh = nullptr;
+		npc_infos = npc_creator.create_npc_infos(10);
+		for (auto info : npc_infos) {
+			npcs.emplace_back(NPCCreator::NPC());
+			NPCCreator::NPC *npc = &npcs.back();
 
-    for (auto info : npc_infos) {
-        npcs.emplace_back(NPCCreator::NPC(info));
-        NPCCreator::NPC npc = npcs.back();
+			for (auto names : info.mesh_names) {
+				std::string part_name = names.first;
+				std::string mesh_name = names.second;
+				auto mesh = npc_creator.mesh_templates[mesh_name].first;
+				auto transform = npc_creator.mesh_templates[mesh_name].second;
 
-        npc.info = &info;
-        for (auto names : info.mesh_names) {
-            std::string part_name = names.first;
-            std::string mesh_name = names.second;
-            auto mesh = npc_creator.mesh_templates[mesh_name].first;
-            auto transform = npc_creator.mesh_templates[mesh_name].second;
+				if (part_name == "body") body_mesh = mesh;
 
-            scene.drawables.emplace_back(new Scene::Transform());
-			Scene::Drawable &drawable = scene.drawables.back();
-			npc.drawables[part_name] = &drawable;
+				scene.drawables.emplace_back(new Scene::Transform());
+				Scene::Drawable &drawable = scene.drawables.back();
+				npc->drawables[part_name] = &drawable;
 
-            *drawable.transform = *transform;
+				*drawable.transform = *transform;
 
-			drawable.pipeline = lit_color_texture_program_pipeline;
-            drawable.pipeline.vao = npc_meshes_for_lit_color_texture_program;
-            drawable.pipeline.type = mesh->type;
-            drawable.pipeline.start = mesh->start;
-            drawable.pipeline.count = mesh->count;
-        }
-		npc.drawables["head"]->transform->parent = npc.drawables["arm_l"]->transform->parent = npc.drawables["arm_r"]->transform->parent = npc.drawables["legs"]->transform->parent = npc.drawables["body"]->transform;
-		npc.drawables["hat"]->transform->parent = npc.drawables["head"]->transform;
-		
-		npc.drawables["arm_r"]->transform->scale.x *= -1;
-		npc.drawables["arm_r"]->transform->position.x *= -1;
-		
-		npc.drawables["body"]->transform->position += glm::vec3((float) std::rand() / (float) RAND_MAX * 50.f, (float) std::rand() / (float) RAND_MAX * 50.f, 0.f);
+				drawable.pipeline = lit_color_texture_program_pipeline;
+				drawable.pipeline.vao = npc_meshes_for_lit_color_texture_program;
+				drawable.pipeline.type = mesh->type;
+				drawable.pipeline.start = mesh->start;
+				drawable.pipeline.count = mesh->count;
+			}
+
+			npc->drawables["head"]->transform->parent = npc->drawables["arm_l"]->transform->parent = npc->drawables["arm_r"]->transform->parent = npc->drawables["legs"]->transform->parent = npc->drawables["body"]->transform;
+			npc->drawables["hat"]->transform->parent = npc->drawables["head"]->transform;
+			
+			npc->drawables["arm_r"]->transform->scale.x *= -1;
+			npc->drawables["arm_r"]->transform->position.x *= -1;
+			
+			npc->drawables["body"]->transform->position += glm::vec3((float) std::rand() / (float) RAND_MAX * 50.f, (float) std::rand() / (float) RAND_MAX * 50.f, 0.f);
+
+			if (body_mesh) {
+				float body_radius = std::min(std::min(
+					std::abs(body_mesh->max.x - body_mesh->min.x),
+					std::abs(body_mesh->max.y - body_mesh->min.y)),
+					std::abs(body_mesh->max.z - body_mesh->min.z));
+
+				npc_radii.emplace_back(body_radius);
+			}
+			else {
+				throw new std::runtime_error("No body mesh could be found!");
+			}
+		}
 	}
+	// create player
+	{
+		// player anchor
+		player.transform = new Scene::Transform();
 
-	// player anchor
-	player.transform = new Scene::Transform();
+		// setup player mesh and camera, and anchor both
+		auto player_mesh = player_template["alien"].first;
+		auto player_transform = player_template["alien"].second;
 
-	// setup player mesh and camera, and anchor both
-	auto player_mesh = player_template["alien"].first;
-	auto player_transform = player_template["alien"].second;
+		scene.drawables.emplace_back(new Scene::Transform());
+		player.drawable = &scene.drawables.back();
+		*(player.drawable->transform) = *player_transform;
+		player.drawable->transform->parent = player.transform;
+		
+		// hide player model since zoomed in at beginning
+		player.drawable->transform->scale = glm::vec3(.01f, .01f, .01f);
+		player.drawable->transform->position = glm::vec3(0.f, 0.f, 1001.f);
 
-	scene.drawables.emplace_back(new Scene::Transform());
-	player.drawable = &scene.drawables.back();
-	*(player.drawable->transform) = *player_transform;
-	player.drawable->transform->parent = player.transform;
+		player.drawable->pipeline = lit_color_texture_program_pipeline;
+		player.drawable->pipeline.vao = ufo_meshes_for_lit_color_texture_program;
+		player.drawable->pipeline.type = player_mesh->type;
+		player.drawable->pipeline.start = player_mesh->start;
+		player.drawable->pipeline.count = player_mesh->count;
 
-	player.drawable->pipeline = lit_color_texture_program_pipeline;
-	player.drawable->pipeline.vao = ufo_meshes_for_lit_color_texture_program;
-	player.drawable->pipeline.type = player_mesh->type;
-	player.drawable->pipeline.start = player_mesh->start;
-	player.drawable->pipeline.count = player_mesh->count;
+		//get pointer to camera for convenience:
+		if (scene.cameras.size() != 1) throw std::runtime_error("Expecting scene to have exactly one camera, but it has " + std::to_string(scene.cameras.size()));
+		camera = &scene.cameras.front();
 
-	//get pointer to camera for convenience:
-	if (scene.cameras.size() != 1) throw std::runtime_error("Expecting scene to have exactly one camera, but it has " + std::to_string(scene.cameras.size()));
-	camera = &scene.cameras.front();
+		cam_info.dist_from_player = 0.f;
 
-	cam_info.dist_from_player = cam_info.MAX_DIST_FROM_PLAYER;
-	cam_info.pitch = (float)M_PI * .5f;
+		cam_info.pitch = (float)M_PI * .5f;
 
-	camera->transform->parent = player.transform;
+		camera->transform->parent = player.transform;
+	}
+	// setup game loop
+	{
+		std::vector < size_t > indices(npcs.size());
+		for (size_t i = 0; i < indices.size(); i++) {
+			indices[i] = i;
+		}
+
+		std::vector < size_t > tmp_targets;
+		tmp_targets.reserve(TARGET_COUNT);
+
+		std::random_device rd;
+		std::mt19937 rng(rd());
+		std::sample(indices.begin(), indices.end(), std::back_inserter(tmp_targets), TARGET_COUNT, std::mt19937 {std::random_device{}()});
+
+		size_t i = 0;
+		for (auto idx : tmp_targets) {
+			// add target idx to container to check for collision later
+			targets.indices.emplace(idx);
+
+			// setup the location of the icon with respect to the camera
+			targets.ui_transforms.emplace_back(new Scene::Transform());
+			Scene::Transform *ui_slot = targets.ui_transforms.back(); 
+			ui_slot->position = glm::vec3(0.f, 0.f, 0.f);
+			ui_slot->scale = glm::vec3(1.f);
+
+			targets.drawables.emplace_back(std::map< std::string, Scene::Drawable * >());
+			auto &ui_drawables = targets.drawables.back();
+			for (auto pair : npcs[idx].drawables) {
+				scene.drawables.emplace_back(new Scene::Transform());
+				Scene::Drawable &drawable = scene.drawables.back();
+				drawable.pipeline = pair.second->pipeline;
+				*(drawable.transform) = *(pair.second->transform);
+				ui_drawables[pair.first] = &scene.drawables.back();
+			}
+
+			ui_drawables["head"]->transform->parent = ui_drawables["arm_l"]->transform->parent = ui_drawables["arm_r"]->transform->parent = ui_drawables["legs"]->transform->parent = ui_drawables["body"]->transform;
+			ui_drawables["hat"]->transform->parent = ui_drawables["head"]->transform;
+
+			ui_drawables["body"]->transform->parent = ui_slot;
+			ui_drawables["body"]->transform->position = glm::vec3(0.f);
+
+			ui_slot->parent = player.transform;
+
+			ui_slot->position = glm::vec3(UI_SPACING * ((float)TARGET_COUNT / 2.f - (float) TARGET_COUNT + (float) TARGET_COUNT / ((float)TARGET_COUNT - 1.f) * (float) i) / TARGET_COUNT, 3.f, 1.5f);
+			ui_drawables["body"]->transform->scale *= .05;
+			i += 1;
+		}
+	}
 }
 
 PlayMode::~PlayMode() {
@@ -193,10 +265,14 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 }
 
 void PlayMode::update(float elapsed) {
+	if (player.dead) {
+		player.drawable->transform->scale = glm::vec3(.01f, .01f, .01f);
+		player.drawable->transform->position = glm::vec3(0.f, 0.f, 1001.f);
+		return;		
+	}
 
 	//update player and camera:
 	{	
-		constexpr glm::vec3 Cam_offset_from_center = glm::vec3(0.0f, 0.0f, 1.0f);
 		constexpr float Tilt = -(float)M_PI / 12.f;
 
 		//combine inputs into a move:
@@ -211,27 +287,34 @@ void PlayMode::update(float elapsed) {
 		if (move != glm::vec2(0.0f)) move = glm::normalize(move);
 
 		// compute new camera position
-		if (wheel.scrolled > 0) {
+		if (wheel.scrolled != 0) {
 			float old_dist = cam_info.dist_from_player;
 			cam_info.dist_from_player += wheel.velocity * cam_info.zoom_speed;
 			if (old_dist < cam_info.dist_from_player) {
 			// zoom out
-				if (cam_info.dist_from_player < cam_info.MIN_DIST_FROM_PLAYER) {
+				if (old_dist < cam_info.MIN_DIST_FROM_PLAYER) {
 					cam_info.dist_from_player = cam_info.MIN_DIST_FROM_PLAYER;
+					// show player model 
+					player.drawable->transform->scale = glm::vec3(1.f);
+					player.drawable->transform->position = glm::vec3(0.f);
 				}
 				else if (cam_info.dist_from_player > cam_info.MAX_DIST_FROM_PLAYER) {
 					cam_info.dist_from_player = cam_info.MAX_DIST_FROM_PLAYER;
 				}
 				wheel.scrolled = 0;
+				wheel.velocity = 0.f;
 			}
 			else if (old_dist > cam_info.dist_from_player) {
 			// zoom in
 				if (cam_info.dist_from_player < cam_info.MIN_DIST_FROM_PLAYER) {
 					cam_info.dist_from_player = 0.f;
+					// hide player model in funky way
+					player.drawable->transform->scale = glm::vec3(.01f, .01f, .01f);
+					player.drawable->transform->position = glm::vec3(0.f, 0.f, 1001.f);
 				}
 				wheel.scrolled = 0;
+				wheel.velocity = 0.f;
 			}
-			wheel.scrolled--;
 		}
 		
 		float cos_yaw = std::cosf(cam_info.yaw);
@@ -294,11 +377,19 @@ void PlayMode::update(float elapsed) {
 		else if (player_rot.z < -(float) M_PI) player_rot.z += (float) M_PI * 2.f;
 
 		// place camera at new location with new rotation
-		camera->transform->position = dir_to_camera * cam_info.dist_from_player + glm::vec3(0.0f, 0.0f, 1.0f);
+		camera->transform->position = dir_to_camera * cam_info.dist_from_player + cam_info.offset;
 		// euler to quat by https://gamedev.stackexchange.com/questions/13436/glm-euler-angles-to-quaternion
 		camera->transform->rotation = glm::quat( glm::vec3(cam_info.pitch, 0.0f, cam_info.yaw));
 	}
-
+	// check collision
+	{
+		for (size_t i = 0; i < npcs.size(); i++) {
+			if (glm::length(player.transform->position - npcs[i].drawables["body"]->transform->position) <= player.collision_radius + npc_radii[i]) {
+				if (targets.indices.find(i) != targets.indices.end())
+					player.dead = true;	
+			}
+		}
+	}
 	//reset button press counters:
 	left.downs = 0;
 	right.downs = 0;

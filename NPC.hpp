@@ -43,14 +43,12 @@ struct NPCCreator {
     };
 
     struct NPC {
-        NPCInfo *info;
         std::map < std::string, Scene::Drawable * > drawables;
-
-        NPC(NPCInfo info) : info(&info) {};
-        NPC(NPCInfo *info) : info(info) {};
     };
 
     std::set< size_t > used_npcs;
+
+    // I DONT THINK I USE THIS, SO DELETE IT LATER AFTER YOU ARE DONE WITH THIS TASK
 	std::vector< NPCInfo > npcs;
 
     // The bits of selection are ordered as tags are ordered.

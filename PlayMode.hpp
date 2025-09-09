@@ -10,21 +10,6 @@
 #include <deque>
 #include <set>
 
-struct Player {
-	Scene::Drawable *drawable;
-	Scene::Transform *transform;
-};
-
-struct CameraInfo {
-	float yaw = 0;
-	float pitch = 0;
-
-	float zoom_speed = 2.f;
-	float dist_from_player = 0;
-	const float MIN_DIST_FROM_PLAYER = 2.f;
-	const float MAX_DIST_FROM_PLAYER = 30.0f;
-};
-
 struct PlayMode : Mode {
 	PlayMode();
 	virtual ~PlayMode();
@@ -50,14 +35,39 @@ struct PlayMode : Mode {
 	//local copy of the game scene (so code can change it during gameplay):
 	Scene scene;
 
-	std::list< NPCCreator::NPC > npcs;
+	// npcs
+	std::vector< NPCCreator::NPC > npcs;
+	std::vector< NPCCreator::NPCInfo > npc_infos;
+	std::vector< float > npc_radii;
+
+	const uint8_t TARGET_COUNT = 5;
+	const float UI_SPACING = 1.2f;
+	struct Targets {
+		std::list< std::map< std::string, Scene::Drawable * >> drawables;
+		std::list< Scene::Transform *> ui_transforms;
+		std::set< size_t > indices;
+	} targets;
 	
 	//camera:
 	Scene::Camera *camera = nullptr;
-	CameraInfo cam_info;
+	struct CameraInfo {
+		float yaw = 0;
+		float pitch = 0;
 
-	Player player;
+		float zoom_speed = 5.f;
+		float dist_from_player = 0.f;
+		const float MIN_DIST_FROM_PLAYER = 2.f;
+		const float MAX_DIST_FROM_PLAYER = 100.0f;
+		glm::vec3 offset = glm::vec3(0.0f, 0.0f, 3.0f);
+	} cam_info;
 
 	//player
+	struct Player {
+		Scene::Drawable *drawable;
+		Scene::Transform *transform;
+		float collision_radius = 2.f;
+		bool dead = false;
+	} player;
+
 
 };

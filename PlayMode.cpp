@@ -168,8 +168,8 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 
 			// yaw and pitch to avoid rolling, clamp each
 			cam_info.yaw -= motion.x * camera->fovy;
-			if (cam_info.yaw > (float)M_PI * 2.f) cam_info.yaw -= (float)M_PI * 2.f;
-			else if (cam_info.yaw < 0.f) cam_info.yaw += (float)M_PI * 2.f;
+			if (cam_info.yaw > (float)M_PI) cam_info.yaw -= (float)M_PI * 2.f;
+			else if (cam_info.yaw < -(float)M_PI) cam_info.yaw += (float)M_PI * 2.f;
 
 			cam_info.pitch += motion.y * camera->fovy;
 			if (cam_info.pitch > (float)M_PI) cam_info.pitch = (float)M_PI;
@@ -233,7 +233,7 @@ void PlayMode::update(float elapsed) {
 			}
 			wheel.scrolled--;
 		}
-
+		
 		float cos_yaw = std::cosf(cam_info.yaw);
 		float sin_yaw = std::sinf(cam_info.yaw);
 		float cos_pitch = std::cosf(cam_info.pitch);
@@ -246,7 +246,7 @@ void PlayMode::update(float elapsed) {
 			cos_pitch
 		));
 
-		static float player_rot = 0;
+		static glm::vec3 player_rot = glm::vec3(0.0f);
 		if (move != glm::vec2(0.f)) {
 			glm::vec3 move_dir = glm::normalize(glm::vec3(
 				move.x * cos_yaw - move.y * sin_yaw, 
@@ -256,30 +256,42 @@ void PlayMode::update(float elapsed) {
 
 			player.transform->position += PlayerSpeed * elapsed * move_dir;
 			
-			// rotate the player in the same way --- lerp between rotation if have time
-			player_rot = cam_info.yaw;
-			// i cant think of the math, so case work
+			float target_rot_z = cam_info.yaw;
+			// i cant think of the math, so case work instead
 			if (move.x > 0.f && move.y > 0.f) {
-				player_rot += -(float)M_PI / 4.f;
+				target_rot_z += -(float)M_PI / 4.f;
 			} else if (move.x > 0.f && move.y == 0.f) {
-				player_rot += -(float)M_PI / 2.f;
+				target_rot_z += -(float)M_PI / 2.f;
 			} else if (move.x > 0.f && move.y < 0.f) {
-				player_rot += -(float)M_PI * .75f;
+				target_rot_z += -(float)M_PI * .75f;
 			} else if (move.x == 0.f && move.y < 0.f) {
-				player_rot += (float) M_PI;
+				target_rot_z += (float) M_PI;
 			} else if (move.x < 0.f && move.y < 0.f) {
-				player_rot += (float) M_PI * .75f;
+				target_rot_z += (float) M_PI * .75f;
 			} else if (move.x < 0.f && move.y == 0.f) {
-				player_rot += (float)M_PI / 2.f;
+				target_rot_z += (float)M_PI / 2.f;
 			} else if (move.x < 0.f && move.y > 0.f) {
-				player_rot += (float)M_PI / 4.f;
+				target_rot_z += (float)M_PI / 4.f;
 			}
+			
+			float diff_z = target_rot_z - player_rot.z;
+			//normalize
+			if (diff_z > (float)M_PI) diff_z -= (float)M_PI * 2.f;
+			else if (diff_z < -(float)M_PI) diff_z += (float)M_PI * 2.f;
 
-			player.drawable->transform->rotation = glm::quat( glm::vec3(Tilt, 0.f, player_rot) );
+			player_rot.x = player_rot.x * .9f + Tilt * .1f;
+			player_rot.z = player_rot.z * .9f + (player_rot.z + diff_z) * .1f;
+			
+
+			player.drawable->transform->rotation = glm::quat(player_rot);
 		}
 		else {
-			player.drawable->transform->rotation = glm::quat (glm::vec3(0.f, 0.f, player_rot));
+			player_rot.x = player_rot.x * .9f;
+			player.drawable->transform->rotation = glm::quat(player_rot);
 		}
+
+		if (player_rot.z > (float) M_PI) player_rot.z -= (float) M_PI * 2.f;
+		else if (player_rot.z < -(float) M_PI) player_rot.z += (float) M_PI * 2.f;
 
 		// place camera at new location with new rotation
 		camera->transform->position = dir_to_camera * cam_info.dist_from_player + glm::vec3(0.0f, 0.0f, 1.0f);

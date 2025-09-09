@@ -12,6 +12,7 @@
 
 struct Player {
 	Scene::Drawable *drawable;
+	Scene::Transform *transform;
 };
 
 struct CameraInfo {
@@ -43,7 +44,7 @@ struct PlayMode : Mode {
 
 	struct Wheel {
 		float velocity = 0;
-		uint8_t scrolled = 0;
+		int scrolled = 0;
 	} wheel;
 
 	//local copy of the game scene (so code can change it during gameplay):

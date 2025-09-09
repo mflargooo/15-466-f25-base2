@@ -86,14 +86,17 @@ PlayMode::PlayMode() : scene(*ufo_scene) {
 		npc.drawables["body"]->transform->position += glm::vec3((float) std::rand() / (float) RAND_MAX * 50.f, (float) std::rand() / (float) RAND_MAX * 50.f, 0.f);
 	}
 
-	// setup player and make camera follow
+	// player anchor
+	player.transform = new Scene::Transform();
+
+	// setup player mesh and camera, and anchor both
 	auto player_mesh = player_template["alien"].first;
 	auto player_transform = player_template["alien"].second;
 
 	scene.drawables.emplace_back(new Scene::Transform());
 	player.drawable = &scene.drawables.back();
 	*(player.drawable->transform) = *player_transform;
-	player.drawable->transform->parent = nullptr;
+	player.drawable->transform->parent = player.transform;
 
 	player.drawable->pipeline = lit_color_texture_program_pipeline;
 	player.drawable->pipeline.vao = ufo_meshes_for_lit_color_texture_program;
@@ -107,6 +110,8 @@ PlayMode::PlayMode() : scene(*ufo_scene) {
 
 	cam_info.dist_from_player = cam_info.MAX_DIST_FROM_PLAYER;
 	cam_info.pitch = (float)M_PI * .5f;
+
+	camera->transform->parent = player.transform;
 }
 
 PlayMode::~PlayMode() {
@@ -167,14 +172,20 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 			else if (cam_info.yaw < 0.f) cam_info.yaw += (float)M_PI * 2.f;
 
 			cam_info.pitch += motion.y * camera->fovy;
-			if (cam_info.pitch > (float)M_PI * 2.f) cam_info.pitch = (float)M_PI * 2.f;
+			if (cam_info.pitch > (float)M_PI) cam_info.pitch = (float)M_PI;
 			else if (cam_info.pitch < 0.f) cam_info.pitch = 0.f;
 
 			return true;
 		}
 	} else if (evt.type == SDL_EVENT_MOUSE_WHEEL) {
-		wheel.scrolled += 1;
-		wheel.velocity += evt.wheel.y;
+		if (std::signbit(wheel.velocity) == std::signbit(evt.wheel.y)) {
+			wheel.velocity += evt.wheel.y;
+			wheel.scrolled += 1;
+		}
+		else {
+			wheel.velocity = evt.wheel.y;
+			wheel.scrolled = 1;
+		}
 		return true;
 	}
 
@@ -183,8 +194,11 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 
 void PlayMode::update(float elapsed) {
 
-	//move camera:
-	{
+	//update player and camera:
+	{	
+		constexpr glm::vec3 Cam_offset_from_center = glm::vec3(0.0f, 0.0f, 1.0f);
+		constexpr float Tilt = -(float)M_PI / 12.f;
+
 		//combine inputs into a move:
 		constexpr float PlayerSpeed = 30.0f;
 		glm::vec2 move = glm::vec2(0.0f);
@@ -194,14 +208,12 @@ void PlayMode::update(float elapsed) {
 		if (!down.pressed && up.pressed) move.y = 1.0f;
 
 		//make it so that moving diagonally doesn't go faster:
-		if (move != glm::vec2(0.0f)) move = glm::normalize(move) * PlayerSpeed * elapsed;
-
-		player.drawable->transform->position += glm::vec3(move.x, move.y, 0.f);
+		if (move != glm::vec2(0.0f)) move = glm::normalize(move);
 
 		// compute new camera position
-		if (wheel.scrolled) {
+		if (wheel.scrolled > 0) {
 			float old_dist = cam_info.dist_from_player;
-			cam_info.dist_from_player += wheel.velocity * cam_info.zoom_speed * elapsed;
+			cam_info.dist_from_player += wheel.velocity * cam_info.zoom_speed;
 			if (old_dist < cam_info.dist_from_player) {
 			// zoom out
 				if (cam_info.dist_from_player < cam_info.MIN_DIST_FROM_PLAYER) {
@@ -219,22 +231,61 @@ void PlayMode::update(float elapsed) {
 				}
 				wheel.scrolled = 0;
 			}
-			wheel.scrolled -= 1;
+			wheel.scrolled--;
 		}
 
+		float cos_yaw = std::cosf(cam_info.yaw);
+		float sin_yaw = std::sinf(cam_info.yaw);
+		float cos_pitch = std::cosf(cam_info.pitch);
+		float sin_pitch = std::sinf(cam_info.pitch);
+
 		// get direction of camera from player, using spherical
-		glm::vec3 new_camera_dir = glm::normalize(glm::vec3(
-			std::sinf(cam_info.pitch) * std::sinf(cam_info.yaw),
-			-std::cosf(cam_info.yaw),
-			std::cosf(cam_info.pitch)
+		glm::vec3 dir_to_camera = glm::normalize(glm::vec3(
+			sin_pitch * sin_yaw,
+			-cos_yaw * sin_pitch,
+			cos_pitch
 		));
 
-		std::cout << new_camera_dir.x << ", " << new_camera_dir.y << ", " << new_camera_dir.z << std::endl;
+		static float player_rot = 0;
+		if (move != glm::vec2(0.f)) {
+			glm::vec3 move_dir = glm::normalize(glm::vec3(
+				move.x * cos_yaw - move.y * sin_yaw, 
+				move.x * sin_yaw + move.y * cos_yaw, 
+				0.f
+			));
 
-		camera->transform->position = player.drawable->transform->position + new_camera_dir * cam_info.dist_from_player;
+			player.transform->position += PlayerSpeed * elapsed * move_dir;
+			
+			// rotate the player in the same way --- lerp between rotation if have time
+			player_rot = cam_info.yaw;
+			// i cant think of the math, so case work
+			if (move.x > 0.f && move.y > 0.f) {
+				player_rot += -(float)M_PI / 4.f;
+			} else if (move.x > 0.f && move.y == 0.f) {
+				player_rot += -(float)M_PI / 2.f;
+			} else if (move.x > 0.f && move.y < 0.f) {
+				player_rot += -(float)M_PI * .75f;
+			} else if (move.x == 0.f && move.y < 0.f) {
+				player_rot += (float) M_PI;
+			} else if (move.x < 0.f && move.y < 0.f) {
+				player_rot += (float) M_PI * .75f;
+			} else if (move.x < 0.f && move.y == 0.f) {
+				player_rot += (float)M_PI / 2.f;
+			} else if (move.x < 0.f && move.y > 0.f) {
+				player_rot += (float)M_PI / 4.f;
+			}
+
+			player.drawable->transform->rotation = glm::quat( glm::vec3(Tilt, 0.f, player_rot) );
+		}
+		else {
+			player.drawable->transform->rotation = glm::quat (glm::vec3(0.f, 0.f, player_rot));
+		}
+
+		// place camera at new location with new rotation
+		camera->transform->position = dir_to_camera * cam_info.dist_from_player + glm::vec3(0.0f, 0.0f, 1.0f);
 		// euler to quat by https://gamedev.stackexchange.com/questions/13436/glm-euler-angles-to-quaternion
 		camera->transform->rotation = glm::quat( glm::vec3(cam_info.pitch, 0.0f, cam_info.yaw));
- 	}
+	}
 
 	//reset button press counters:
 	left.downs = 0;

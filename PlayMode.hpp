@@ -41,8 +41,6 @@ struct PlayMode : Mode {
 	Scene scene;
 
 	// npcs
-	size_t NPCS = 64;
-	float SPAWN_RADIUS = (float) NPCS * 5.f;
 
 	std::vector< NPCCreator::NPC > npcs;
 	std::vector< NPCCreator::NPCInfo > npc_infos;
@@ -79,5 +77,5 @@ struct PlayMode : Mode {
 		bool dead = false;
 	} player;
 
-
+	bool score_displayed = false;
 };

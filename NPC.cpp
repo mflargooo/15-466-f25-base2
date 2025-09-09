@@ -61,15 +61,12 @@ void NPCCreator::register_data(const std::map< std::string, Mesh > *meshes) {
 }
 
 std::vector< NPCCreator::NPCInfo > NPCCreator::create_npc_infos(size_t amount) {
-    assert(total_possible_npcs > 0 && amount + used_npcs.size() < total_possible_npcs);
-
     std::vector< NPCInfo > ret = std::vector< NPCInfo >();
     ret.reserve(amount);
     
     for (size_t i = 0; i < amount; i++) {
         ret.emplace_back(this);
         NPCInfo *npc = &(ret.back());
-        assert(npc);
 
         size_t selection;
         std::string part;

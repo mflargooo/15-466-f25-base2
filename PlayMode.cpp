@@ -14,6 +14,10 @@
 #include <vector>
 #include <algorithm>
 
+size_t score = 0;
+size_t level = 0;
+size_t npcs_to_spawn = 4;
+
 GLuint npc_meshes_for_lit_color_texture_program = 0;
 NPCCreator npc_creator({ "head", "body", "arm", "legs", "hat" }, { "head", "body", "arm_l", "arm_r", "legs", "hat" });
 Load< MeshBuffer > npc_meshes(LoadTagDefault, []() -> MeshBuffer const * {
@@ -51,13 +55,25 @@ PlayMode::PlayMode() : scene(*ufo_scene) {
 	// create npcs
 	{
 		//organize meshes for convenience
-		npc_creator.initialize();
-		npc_creator.register_data(&(npc_meshes->meshes));
+		static bool initialized = false;
+		if (!initialized) {
+			npc_creator.initialize();
+			npc_creator.register_data(&(npc_meshes->meshes));
+		}
+		initialized = true;
+
+		level += 1;
+		npcs_to_spawn *= 2;
+		npcs_to_spawn = std::min(npcs_to_spawn, (size_t)512);
+		float spawn_radius = (npcs_to_spawn + 50.f);
+		std::cout << std::endl << "---------------------------------------" << std::endl << std::endl;
+		std::cout << "| LEVEL: " << level << "! FIND " << (size_t) TARGET_COUNT << " IMPOSTORS OUT OF " << npcs_to_spawn << " |" << std::endl;
+		std::cout << "---------------------------------------" << std::endl << std::endl;
 
 		const Mesh *body_mesh = nullptr;
-		npc_infos = npc_creator.create_npc_infos(NPCS);
+		npc_infos = npc_creator.create_npc_infos(npcs_to_spawn);
 
-		std::uniform_real_distribution< float > spawner(-SPAWN_RADIUS / 2.f, SPAWN_RADIUS / 2);
+		std::uniform_real_distribution< float > spawner(-spawn_radius / 2.f, spawn_radius / 2);
 		std::uniform_real_distribution< float > rand_angle(0.f, (float)M_PI * 2.f);
 
 		for (auto info : npc_infos) {
@@ -111,7 +127,7 @@ PlayMode::PlayMode() : scene(*ufo_scene) {
 			do {
 				rand_pos = glm::vec3(spawner(rng), spawner(rng), 0.f);
 				for (size_t i = 0; i < npcs.size() - 1; i++) {
-					if (glm::length(rand_pos - npcs[i].drawables["body"]->transform->position) <= npc_radii[i] + body_radius) {
+					if (glm::length(rand_pos - npcs[i].drawables["body"]->transform->position) <= npc_radii[i]) {
 						near_npc = true;
 						break;
 					}
@@ -220,7 +236,6 @@ PlayMode::PlayMode() : scene(*ufo_scene) {
 			ui_drawables["body"]->transform->scale *= .05;
 			i += 1;
 		}
-		std::cout << std::endl;
 	}
 }
 
@@ -230,12 +245,8 @@ PlayMode::~PlayMode() {
 	}
 
 	delete player.transform;
-
-	delete npc_meshes;
-	delete npcs_scene;
-
-	delete ufo_meshes;
-	delete ufo_scene;
+	npc_creator.npcs.clear();
+	npc_creator.used_npcs.clear();
 }
 
 bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size) {
@@ -260,6 +271,13 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 			down.downs += 1;
 			down.pressed = true;
 			return true;
+		} else if (evt.key.key == SDLK_R) {
+			score = 0;
+			level = 0;
+			npcs_to_spawn = 4;
+			return false;
+		} else if (evt.key.key == SDLK_N) {
+			return score != TARGET_COUNT * level;
 		}
 	} else if (evt.type == SDL_EVENT_KEY_UP) {
 		if (evt.key.key == SDLK_A) {
@@ -315,9 +333,23 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 
 void PlayMode::update(float elapsed) {
 	if (player.dead) {
-		player.drawable->transform->scale = glm::vec3(.01f, .01f, .01f);
-		player.drawable->transform->position = glm::vec3(0.f, 0.f, 1001.f);
-		return;		
+		if (!score_displayed) {
+			score_displayed = true;
+			player.drawable->transform->scale = glm::vec3(.01f, .01f, .01f);
+			player.drawable->transform->position = glm::vec3(0.f, 0.f, 1005.f);
+			player.saucer_drawable->transform->scale = glm::vec3(.01f, .01f, .01f);
+			player.saucer_drawable->transform->position = glm::vec3(0.f, 0.f, 1005.f);
+
+			for (auto ui_transform : targets.ui_transforms) {
+				ui_transform->position = glm::vec3(0.f, 0.f, 1005.f);
+			}
+			std::cout << std::endl << "*********************************************" << std::endl;
+			std::cout << "* YOUR RUN IS OVER! ELIMINATED " << score << " IMPOSTORS! *" << std::endl;
+			std::cout << "*********************************************" << std::endl;
+			std::cout << std::endl << "Press: R - To Restart" << std::endl;
+			std::cout << "       Q - To Quit" << std::endl;
+		}
+		return;
 	}
 
 	//update player and camera:
@@ -453,16 +485,17 @@ void PlayMode::update(float elapsed) {
 				// if it was, move off screen
 				if (valid_target_idx >= 0) {
 				//simply move the transform off screen to avoid cleaning up memory at the moment 
-					std::cout << "YOU ELIMINATED AN IMPOSTOR!" << std::endl;
+					std::cout << "YOU ELIMINATED AN IMPOSTOR! +1" << std::endl;
 					npcs[i].drawables["body"]->transform->position = glm::vec3(0.0f, 0.0f, 1005.f);
 					npcs[i].drawables["body"]->transform->scale *= .2f;
 					targets.alive[valid_target_idx] = false;
 					targets.ui_transforms[valid_target_idx]->position = glm::vec3(0.0f, 0.0f, 1005.f);
+					score += 1;
 					break;
 				}
 				else { // die
-					std::cout << "YOU LOST!" << std::endl;
 					player.dead = true;
+					break;
 				}
 			}
 		}
@@ -510,12 +543,12 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 		));
 
 		constexpr float H = 0.09f;
-		lines.draw_text("Mouse motion rotates camera; WASD moves; escape ungrabs mouse",
+		lines.draw_text("Mouse motion rotates camera; Scroll wheel zooms camera; WASD moves; escape ungrabs mouse",
 			glm::vec3(-aspect + 0.1f * H, -1.0 + 0.1f * H, 0.0),
 			glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
 			glm::u8vec4(0x00, 0x00, 0x00, 0x00));
 		float ofs = 2.0f / drawable_size.y;
-		lines.draw_text("Mouse motion rotates camera; WASD moves; escape ungrabs mouse",
+		lines.draw_text("Mouse motion rotates camera; Scroll wheel zooms camera; WASD moves; escape ungrabs mouse",
 			glm::vec3(-aspect + 0.1f * H + ofs, -1.0 + 0.1f * H + ofs, 0.0),
 			glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
 			glm::u8vec4(0xff, 0xff, 0xff, 0x00));

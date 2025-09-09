@@ -55,7 +55,11 @@ PlayMode::PlayMode() : scene(*ufo_scene) {
 		npc_creator.register_data(&(npc_meshes->meshes));
 
 		const Mesh *body_mesh = nullptr;
-		npc_infos = npc_creator.create_npc_infos(10);
+		npc_infos = npc_creator.create_npc_infos(NPCS);
+
+		std::uniform_real_distribution< float > spawner(-SPAWN_RADIUS / 2.f, SPAWN_RADIUS / 2);
+		std::uniform_real_distribution< float > rand_angle(0.f, (float)M_PI * 2.f);
+
 		for (auto info : npc_infos) {
 			npcs.emplace_back(NPCCreator::NPC());
 			NPCCreator::NPC *npc = &npcs.back();
@@ -81,16 +85,10 @@ PlayMode::PlayMode() : scene(*ufo_scene) {
 				drawable.pipeline.count = mesh->count;
 			}
 
-			npc->drawables["head"]->transform->parent = npc->drawables["arm_l"]->transform->parent = npc->drawables["arm_r"]->transform->parent = npc->drawables["legs"]->transform->parent = npc->drawables["body"]->transform;
-			npc->drawables["hat"]->transform->parent = npc->drawables["head"]->transform;
-			
-			npc->drawables["arm_r"]->transform->scale.x *= -1;
-			npc->drawables["arm_r"]->transform->position.x *= -1;
-			
-			npc->drawables["body"]->transform->position += glm::vec3((float) std::rand() / (float) RAND_MAX * 50.f, (float) std::rand() / (float) RAND_MAX * 50.f, 0.f);
-
+			// since body is reused, maybe hash mesh.start with body radius
+			float body_radius = -1;
 			if (body_mesh) {
-				float body_radius = std::min(std::min(
+				body_radius = std::min(std::min(
 					std::abs(body_mesh->max.x - body_mesh->min.x),
 					std::abs(body_mesh->max.y - body_mesh->min.y)),
 					std::abs(body_mesh->max.z - body_mesh->min.z));
@@ -100,6 +98,30 @@ PlayMode::PlayMode() : scene(*ufo_scene) {
 			else {
 				throw new std::runtime_error("No body mesh could be found!");
 			}
+
+			npc->drawables["head"]->transform->parent = npc->drawables["arm_l"]->transform->parent = npc->drawables["arm_r"]->transform->parent = npc->drawables["legs"]->transform->parent = npc->drawables["body"]->transform;
+			npc->drawables["hat"]->transform->parent = npc->drawables["head"]->transform;
+			
+			npc->drawables["arm_r"]->transform->scale.x *= -1;
+			npc->drawables["arm_r"]->transform->position.x *= -1;
+			
+			glm::vec3 rand_pos = glm::vec3(0.f);
+			size_t trials = 0;
+			bool near_npc = false;
+			do {
+				rand_pos = glm::vec3(spawner(rng), spawner(rng), 0.f);
+				for (size_t i = 0; i < npcs.size() - 1; i++) {
+					if (glm::length(rand_pos - npcs[i].drawables["body"]->transform->position) <= npc_radii[i] + body_radius) {
+						near_npc = true;
+						break;
+					}
+				}
+				trials++;
+			} while (trials < 100 && (near_npc || glm::length(rand_pos) < player.collision_radius * 2.5f));
+			
+			npc->drawables["body"]->transform->position += rand_pos;
+
+			npc->drawables["body"]->transform->rotation = glm::quat( glm::vec3(0.f, 0.f, rand_angle(rng)));
 		}
 	}
 	// create player
@@ -136,7 +158,7 @@ PlayMode::PlayMode() : scene(*ufo_scene) {
 
 		camera->transform->parent = player.transform;
 	}
-	// setup game loop
+	// setup game loop, ui instantiation
 	{
 		std::vector < size_t > indices(npcs.size());
 		for (size_t i = 0; i < indices.size(); i++) {
@@ -146,18 +168,19 @@ PlayMode::PlayMode() : scene(*ufo_scene) {
 		std::vector < size_t > tmp_targets;
 		tmp_targets.reserve(TARGET_COUNT);
 
-		std::random_device rd;
-		std::mt19937 rng(rd());
-		std::sample(indices.begin(), indices.end(), std::back_inserter(tmp_targets), TARGET_COUNT, std::mt19937 {std::random_device{}()});
+		std::sample(indices.begin(), indices.end(), std::back_inserter(tmp_targets), TARGET_COUNT, rng);
 
 		size_t i = 0;
 		for (auto idx : tmp_targets) {
 			// add target idx to container to check for collision later
-			targets.indices.emplace(idx);
+			targets.npc_idxs.emplace_back(idx);
+			targets.alive.emplace_back(true);
 
 			// setup the location of the icon with respect to the camera
-			targets.ui_transforms.emplace_back(new Scene::Transform());
+			scene.drawables.emplace_back(new Scene::Transform());
+			targets.ui_transforms.emplace_back(scene.drawables.back().transform);
 			Scene::Transform *ui_slot = targets.ui_transforms.back(); 
+
 			ui_slot->position = glm::vec3(0.f, 0.f, 0.f);
 			ui_slot->scale = glm::vec3(1.f);
 
@@ -176,17 +199,29 @@ PlayMode::PlayMode() : scene(*ufo_scene) {
 
 			ui_drawables["body"]->transform->parent = ui_slot;
 			ui_drawables["body"]->transform->position = glm::vec3(0.f);
+			ui_drawables["body"]->transform->rotation = glm::quat( glm::vec3(0.f) );
 
 			ui_slot->parent = player.transform;
 
-			ui_slot->position = glm::vec3(UI_SPACING * ((float)TARGET_COUNT / 2.f - (float) TARGET_COUNT + (float) TARGET_COUNT / ((float)TARGET_COUNT - 1.f) * (float) i) / TARGET_COUNT, 3.f, 1.5f);
 			ui_drawables["body"]->transform->scale *= .05;
 			i += 1;
 		}
+		std::cout << std::endl;
 	}
 }
 
 PlayMode::~PlayMode() {
+	for (auto drawable : scene.drawables) {
+		delete drawable.transform;
+	}
+
+	delete player.transform;
+
+	delete npc_meshes;
+	delete npcs_scene;
+
+	delete ufo_meshes;
+	delete ufo_scene;
 }
 
 bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size) {
@@ -369,7 +404,7 @@ void PlayMode::update(float elapsed) {
 			player.drawable->transform->rotation = glm::quat(player_rot);
 		}
 		else {
-			player_rot.x = player_rot.x * .9f;
+			player_rot.x = player_rot.x * .9f;	
 			player.drawable->transform->rotation = glm::quat(player_rot);
 		}
 
@@ -380,13 +415,41 @@ void PlayMode::update(float elapsed) {
 		camera->transform->position = dir_to_camera * cam_info.dist_from_player + cam_info.offset;
 		// euler to quat by https://gamedev.stackexchange.com/questions/13436/glm-euler-angles-to-quaternion
 		camera->transform->rotation = glm::quat( glm::vec3(cam_info.pitch, 0.0f, cam_info.yaw));
+
+		for (size_t i = 0; i < TARGET_COUNT; i++) {
+			if (!targets.alive[i]) continue;
+			glm::vec3 base_pos = glm::vec3(UI_SPACING * ((float)TARGET_COUNT / 2.f - (float) TARGET_COUNT + (float) TARGET_COUNT / ((float)TARGET_COUNT - 1.f) * (float) i) / TARGET_COUNT, 3.f, 1.2f);
+			targets.ui_transforms[i]->position = glm::vec3(base_pos.x * cos_yaw - base_pos.y * sin_yaw, base_pos.x * sin_yaw + base_pos.y * cos_yaw, base_pos.z);
+			targets.ui_transforms[i]->rotation = glm::quat( glm::vec3(0.f, 0.f, cam_info.yaw));
+		}
 	}
 	// check collision
 	{
 		for (size_t i = 0; i < npcs.size(); i++) {
 			if (glm::length(player.transform->position - npcs[i].drawables["body"]->transform->position) <= player.collision_radius + npc_radii[i]) {
-				if (targets.indices.find(i) != targets.indices.end())
-					player.dead = true;	
+				// check to see if npc we collided with was a target
+				int32_t valid_target_idx = -1;
+				for (size_t j = 0; j < TARGET_COUNT; j++) {
+					if (i == targets.npc_idxs[j]) {
+						valid_target_idx = (int32_t) j;
+						break;
+					}
+				}
+
+				// if it was, move off screen
+				if (valid_target_idx >= 0) {
+				//simply move the transform off screen to avoid cleaning up memory at the moment 
+					std::cout << "YOU ELIMINATED AN IMPOSTOR!" << std::endl;
+					npcs[i].drawables["body"]->transform->position = glm::vec3(0.0f, 0.0f, 1005.f);
+					npcs[i].drawables["body"]->transform->scale *= .2f;
+					targets.alive[valid_target_idx] = false;
+					targets.ui_transforms[valid_target_idx]->position = glm::vec3(0.0f, 0.0f, 1005.f);
+					break;
+				}
+				else { // die
+					std::cout << "YOU LOST!" << std::endl;
+					player.dead = true;
+				}
 			}
 		}
 	}

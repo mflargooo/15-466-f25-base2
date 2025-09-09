@@ -9,6 +9,7 @@
 #include <vector>
 #include <deque>
 #include <set>
+#include <random>
 
 struct PlayMode : Mode {
 	PlayMode();
@@ -20,6 +21,10 @@ struct PlayMode : Mode {
 	virtual void draw(glm::uvec2 const &drawable_size) override;
 
 	//----- game state -----
+
+	// c++ random generation from stackoverflow: https://stackoverflow.com/questions/7560114/random-number-c-in-some-range
+    std::random_device rd;
+    std::mt19937 rng{rd()};
 
 	//input tracking:
 	struct Button {
@@ -36,6 +41,9 @@ struct PlayMode : Mode {
 	Scene scene;
 
 	// npcs
+	size_t NPCS = 64;
+	float SPAWN_RADIUS = (float) NPCS * 5.f;
+
 	std::vector< NPCCreator::NPC > npcs;
 	std::vector< NPCCreator::NPCInfo > npc_infos;
 	std::vector< float > npc_radii;
@@ -44,15 +52,16 @@ struct PlayMode : Mode {
 	const float UI_SPACING = 1.2f;
 	struct Targets {
 		std::list< std::map< std::string, Scene::Drawable * >> drawables;
-		std::list< Scene::Transform *> ui_transforms;
-		std::set< size_t > indices;
+		std::vector< Scene::Transform *> ui_transforms;
+		std::vector< size_t > npc_idxs;
+		std::vector< bool > alive;
 	} targets;
 	
 	//camera:
 	Scene::Camera *camera = nullptr;
 	struct CameraInfo {
-		float yaw = 0;
-		float pitch = 0;
+		float yaw = 0.f;
+		float pitch = 0.f;
 
 		float zoom_speed = 5.f;
 		float dist_from_player = 0.f;

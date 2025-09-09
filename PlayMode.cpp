@@ -130,13 +130,21 @@ PlayMode::PlayMode() : scene(*ufo_scene) {
 		player.transform = new Scene::Transform();
 
 		// setup player mesh and camera, and anchor both
-		auto player_mesh = player_template["alien"].first;
-		auto player_transform = player_template["alien"].second;
+		auto alien_mesh = player_template["alien"].first;
+		auto alien_transform = player_template["alien"].second;
+
+		auto saucer_mesh = player_template["saucer"].first;
+		auto saucer_transform = player_template["saucer"].second;
 
 		scene.drawables.emplace_back(new Scene::Transform());
 		player.drawable = &scene.drawables.back();
-		*(player.drawable->transform) = *player_transform;
-		player.drawable->transform->parent = player.transform;
+		scene.drawables.emplace_back(new Scene::Transform());
+		player.saucer_drawable = &scene.drawables.back();
+
+		*(player.drawable->transform) = *alien_transform;
+		*(player.saucer_drawable->transform) = *saucer_transform;
+		player.drawable->transform->parent = player.saucer_drawable->transform;
+		player.saucer_drawable->transform->parent = player.transform;
 		
 		// hide player model since zoomed in at beginning
 		player.drawable->transform->scale = glm::vec3(.01f, .01f, .01f);
@@ -144,9 +152,15 @@ PlayMode::PlayMode() : scene(*ufo_scene) {
 
 		player.drawable->pipeline = lit_color_texture_program_pipeline;
 		player.drawable->pipeline.vao = ufo_meshes_for_lit_color_texture_program;
-		player.drawable->pipeline.type = player_mesh->type;
-		player.drawable->pipeline.start = player_mesh->start;
-		player.drawable->pipeline.count = player_mesh->count;
+		player.drawable->pipeline.type = alien_mesh->type;
+		player.drawable->pipeline.start = alien_mesh->start;
+		player.drawable->pipeline.count = alien_mesh->count;
+
+		player.saucer_drawable->pipeline = lit_color_texture_program_pipeline;
+		player.saucer_drawable->pipeline.vao = ufo_meshes_for_lit_color_texture_program;
+		player.saucer_drawable->pipeline.type = saucer_mesh->type;
+		player.saucer_drawable->pipeline.start = saucer_mesh->start;
+		player.saucer_drawable->pipeline.count = saucer_mesh->count;
 
 		//get pointer to camera for convenience:
 		if (scene.cameras.size() != 1) throw std::runtime_error("Expecting scene to have exactly one camera, but it has " + std::to_string(scene.cameras.size()));
@@ -199,7 +213,7 @@ PlayMode::PlayMode() : scene(*ufo_scene) {
 
 			ui_drawables["body"]->transform->parent = ui_slot;
 			ui_drawables["body"]->transform->position = glm::vec3(0.f);
-			ui_drawables["body"]->transform->rotation = glm::quat( glm::vec3(0.f) );
+			ui_drawables["body"]->transform->rotation = glm::quat( glm::vec3(-(float) M_PI / 6.0f, 0.f, 0.f) );
 
 			ui_slot->parent = player.transform;
 
@@ -401,11 +415,11 @@ void PlayMode::update(float elapsed) {
 			player_rot.z = player_rot.z * .9f + (player_rot.z + diff_z) * .1f;
 			
 
-			player.drawable->transform->rotation = glm::quat(player_rot);
+			player.saucer_drawable->transform->rotation = glm::quat(player_rot);
 		}
 		else {
 			player_rot.x = player_rot.x * .9f;	
-			player.drawable->transform->rotation = glm::quat(player_rot);
+			player.saucer_drawable->transform->rotation = glm::quat(player_rot);
 		}
 
 		if (player_rot.z > (float) M_PI) player_rot.z -= (float) M_PI * 2.f;
@@ -418,7 +432,7 @@ void PlayMode::update(float elapsed) {
 
 		for (size_t i = 0; i < TARGET_COUNT; i++) {
 			if (!targets.alive[i]) continue;
-			glm::vec3 base_pos = glm::vec3(UI_SPACING * ((float)TARGET_COUNT / 2.f - (float) TARGET_COUNT + (float) TARGET_COUNT / ((float)TARGET_COUNT - 1.f) * (float) i) / TARGET_COUNT, 3.f, 1.2f);
+			glm::vec3 base_pos = glm::vec3(UI_SPACING * ((float)TARGET_COUNT / 2.f - (float) TARGET_COUNT + (float) TARGET_COUNT / ((float)TARGET_COUNT - 1.f) * (float) i) / TARGET_COUNT, 2.75f, 1.f);
 			targets.ui_transforms[i]->position = glm::vec3(base_pos.x * cos_yaw - base_pos.y * sin_yaw, base_pos.x * sin_yaw + base_pos.y * cos_yaw, base_pos.z);
 			targets.ui_transforms[i]->rotation = glm::quat( glm::vec3(0.f, 0.f, cam_info.yaw));
 		}

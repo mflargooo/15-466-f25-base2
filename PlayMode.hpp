@@ -49,7 +49,7 @@ struct PlayMode : Mode {
 	std::vector< float > npc_radii;
 
 	const uint8_t TARGET_COUNT = 5;
-	const float UI_SPACING = 1.2f;
+	const float UI_SPACING = 1.5f;
 	struct Targets {
 		std::list< std::map< std::string, Scene::Drawable * >> drawables;
 		std::vector< Scene::Transform *> ui_transforms;
@@ -73,6 +73,7 @@ struct PlayMode : Mode {
 	//player
 	struct Player {
 		Scene::Drawable *drawable;
+		Scene::Drawable *saucer_drawable;
 		Scene::Transform *transform;
 		float collision_radius = 2.f;
 		bool dead = false;

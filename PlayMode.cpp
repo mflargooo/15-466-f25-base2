@@ -66,9 +66,9 @@ PlayMode::PlayMode() : scene(*ufo_scene) {
 		npcs_to_spawn *= 2;
 		npcs_to_spawn = std::min(npcs_to_spawn, (size_t)512);
 		float spawn_radius = (npcs_to_spawn + 50.f);
-		std::cout << std::endl << "---------------------------------------" << std::endl << std::endl;
-		std::cout << "| LEVEL: " << level << "! FIND " << (size_t) TARGET_COUNT << " IMPOSTORS OUT OF " << npcs_to_spawn << " |" << std::endl;
-		std::cout << "---------------------------------------" << std::endl << std::endl;
+		std::cout << std::endl << "--------------------------------------" << std::endl << std::endl;
+		std::cout << "| LEVEL: " << level << "! FIND " << (size_t) TARGET_COUNT << " TARGETS OUT OF " << npcs_to_spawn << " |" << std::endl;
+		std::cout << "--------------------------------------" << std::endl << std::endl;
 
 		const Mesh *body_mesh = nullptr;
 		npc_infos = npc_creator.create_npc_infos(npcs_to_spawn);
@@ -127,13 +127,13 @@ PlayMode::PlayMode() : scene(*ufo_scene) {
 			do {
 				rand_pos = glm::vec3(spawner(rng), spawner(rng), 0.f);
 				for (size_t i = 0; i < npcs.size() - 1; i++) {
-					if (glm::length(rand_pos - npcs[i].drawables["body"]->transform->position) <= npc_radii[i]) {
+					if (glm::length(rand_pos - npcs[i].drawables["body"]->transform->position) <= 2.f * (npc_radii[i] - (float) trials / 1000.f)) {
 						near_npc = true;
 						break;
 					}
 				}
 				trials++;
-			} while (trials < 100 && (near_npc || glm::length(rand_pos) < player.collision_radius * 2.5f));
+			} while (trials < 1000 && (near_npc || glm::length(rand_pos) < player.collision_radius * 2.5f));
 			
 			npc->drawables["body"]->transform->position += rand_pos;
 
@@ -276,8 +276,13 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 			level = 0;
 			npcs_to_spawn = 4;
 			return false;
-		} else if (evt.key.key == SDLK_N) {
+		} else if (evt.key.key == SDLK_SPACE) {
 			return score != TARGET_COUNT * level;
+		} else if (evt.key.key == SDLK_Q) {
+			std::cout << std::endl << "***********************************************" << std::endl;
+			std::cout << "* YOUR CAREER IS OVER! ELIMINATED " << score << " TARGETS! *" << std::endl;
+			std::cout << "***********************************************" << std::endl;
+			return false;
 		}
 	} else if (evt.type == SDL_EVENT_KEY_UP) {
 		if (evt.key.key == SDLK_A) {
@@ -344,7 +349,7 @@ void PlayMode::update(float elapsed) {
 				ui_transform->position = glm::vec3(0.f, 0.f, 1005.f);
 			}
 			std::cout << std::endl << "*********************************************" << std::endl;
-			std::cout << "* YOUR RUN IS OVER! ELIMINATED " << score << " IMPOSTORS! *" << std::endl;
+			std::cout << "* YOUR RUN IS OVER! ELIMINATED " << score << " TARGETS! *" << std::endl;
 			std::cout << "*********************************************" << std::endl;
 			std::cout << std::endl << "Press: R - To Restart" << std::endl;
 			std::cout << "       Q - To Quit" << std::endl;
@@ -485,7 +490,7 @@ void PlayMode::update(float elapsed) {
 				// if it was, move off screen
 				if (valid_target_idx >= 0) {
 				//simply move the transform off screen to avoid cleaning up memory at the moment 
-					std::cout << "YOU ELIMINATED AN IMPOSTOR! +1" << std::endl;
+					std::cout << "YOU ELIMINATED +1 TARGET!" << std::endl;
 					npcs[i].drawables["body"]->transform->position = glm::vec3(0.0f, 0.0f, 1005.f);
 					npcs[i].drawables["body"]->transform->scale *= .2f;
 					targets.alive[valid_target_idx] = false;

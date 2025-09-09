@@ -64,7 +64,7 @@ int main(int argc, char **argv) {
 
 	//create window:
 	Mode::window = SDL_CreateWindow(
-		"gp25 game2: enter the matr... virtual world", //TODO: remember to set a title for your game!
+		"Alien Hitman", //TODO: remember to set a title for your game!
 		1920, 1080, //TODO: modify window size if you'd like
 		SDL_WINDOW_OPENGL
 		| SDL_WINDOW_RESIZABLE //uncomment to allow resizing
@@ -162,7 +162,7 @@ int main(int argc, char **argv) {
 					save_png(filename, glm::uvec2(w,h), data.data(), LowerLeftOrigin);
 				} else if (evt.type == SDL_EVENT_KEY_DOWN && evt.key.key == SDLK_R) {
 					Mode::set_current(std::make_shared< PlayMode >());
-				} else if (evt.type == SDL_EVENT_KEY_DOWN && evt.key.key == SDLK_N) {
+				} else if (evt.type == SDL_EVENT_KEY_DOWN && evt.key.key == SDLK_SPACE) {
 					Mode::set_current(std::make_shared< PlayMode >());
 				}
 			}

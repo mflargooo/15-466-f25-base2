@@ -10,6 +10,19 @@
 #include <deque>
 #include <set>
 
+struct Player {
+	Scene::Drawable *drawable;
+};
+
+struct CameraInfo {
+	float yaw = 0;
+	float pitch = 0;
+
+	float zoom_speed = 2.f;
+	float dist_from_player = 0;
+	const float MIN_DIST_FROM_PLAYER = 2.f;
+	const float MAX_DIST_FROM_PLAYER = 30.0f;
+};
 
 struct PlayMode : Mode {
 	PlayMode();
@@ -28,6 +41,11 @@ struct PlayMode : Mode {
 		uint8_t pressed = 0;
 	} left, right, down, up;
 
+	struct Wheel {
+		float velocity = 0;
+		uint8_t scrolled = 0;
+	} wheel;
+
 	//local copy of the game scene (so code can change it during gameplay):
 	Scene scene;
 
@@ -35,5 +53,10 @@ struct PlayMode : Mode {
 	
 	//camera:
 	Scene::Camera *camera = nullptr;
+	CameraInfo cam_info;
+
+	Player player;
+
+	//player
 
 };

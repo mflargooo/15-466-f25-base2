@@ -557,5 +557,47 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 			glm::vec3(-aspect + 0.1f * H + ofs, -1.0 + 0.1f * H + ofs, 0.0),
 			glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
 			glm::u8vec4(0xff, 0xff, 0xff, 0x00));
+
+		char game_state_text[40];
+		std::snprintf(&game_state_text[0], 16, "LEVEL: %zd\tELIMINATIONS: %zd", level, score);
+		lines.draw_text(game_state_text,
+			glm::vec3(-aspect + .1f * H, .9 - .1f * H, 0.0),
+			glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
+			glm::u8vec4(0x00, 0x00, 0x00, 0x00));
+		std::snprintf(&game_state_text[0], 40, "LEVEL: %zd     ELIMINATIONS: %zd", level, score);
+		lines.draw_text(game_state_text,
+			glm::vec3(-aspect + .1f * H + ofs, .9 - .1f * H + ofs, 0.0),
+			glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
+			glm::u8vec4(0xff, 0xff, 0xff, 0x00));
+
+		if (score == TARGET_COUNT * level && !player.dead) {
+			lines.draw_text("SPACE - Next Quota",
+				glm::vec3(-.35, 0.f, 0.0),
+				glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
+				glm::u8vec4(0x0, 0x0, 0x0, 0x00));
+			lines.draw_text("SPACE - Next Quota",
+				glm::vec3(ofs -.35, ofs, 0.0),
+				glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
+				glm::u8vec4(0xff, 0xff, 0xff, 0x00));
+		}
+		else if (player.dead) {
+			lines.draw_text("R - Restart",
+				glm::vec3(-.2, 0.f, 0.0),
+				glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
+				glm::u8vec4(0x0, 0x0, 0x0, 0x00));
+			lines.draw_text("R - Restart",
+				glm::vec3(ofs -.2, ofs, 0.0),
+				glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
+				glm::u8vec4(0xff, 0xff, 0xff, 0x00));
+
+			lines.draw_text("Q - Quit",
+				glm::vec3(-.15, -.15, 0.0),
+				glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
+				glm::u8vec4(0x0, 0x0, 0x0, 0x00));
+			lines.draw_text("Q - Quit",
+				glm::vec3(ofs -.15, ofs - .15, 0.0),
+				glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
+				glm::u8vec4(0xff, 0xff, 0xff, 0x00));
+		}
 	}
 }

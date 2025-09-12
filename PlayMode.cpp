@@ -245,7 +245,6 @@ PlayMode::~PlayMode() {
 	}
 
 	delete player.transform;
-	npc_creator.npcs.clear();
 	npc_creator.used_npcs.clear();
 }
 

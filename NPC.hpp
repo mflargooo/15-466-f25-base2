@@ -48,9 +48,6 @@ struct NPCCreator {
 
     std::set< size_t > used_npcs;
 
-    // I DONT THINK I USE THIS, SO DELETE IT LATER AFTER YOU ARE DONE WITH THIS TASK
-	std::vector< NPCInfo > npcs;
-
     // The bits of selection are ordered as tags are ordered.
     NPCCreator(std::vector< std::string > tags, std::vector< std::string > part_names) : tags(tags), part_names(part_names) {};
     void initialize();
